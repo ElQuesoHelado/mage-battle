@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://egtg3p38osqu"]
+
+[ext_resource type="Script" uid="uid://cpoi42mmrn8an" path="res://scripts/fireball.gd" id="1_ltln1"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_acgjg"]
+emission_enabled = true
+emission = Color(1, 0.35686275, 0, 1)
+emission_energy_multiplier = 1.77
+
+[sub_resource type="SphereMesh" id="SphereMesh_s5th7"]
+radius = 0.1
+height = 0.2
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_5h11f"]
+radius = 0.08
+
+[node name="Fireball" type="RigidBody3D" unique_id=962893918]
+script = ExtResource("1_ltln1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=504608755]
+material_override = SubResource("StandardMaterial3D_acgjg")
+mesh = SubResource("SphereMesh_s5th7")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=559297296]
+shape = SubResource("SphereShape3D_5h11f")
