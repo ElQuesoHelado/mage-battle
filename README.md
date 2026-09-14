@@ -1,13 +1,10 @@
-# XR Hand Tracking Demo
+# Mage Battle
 
-This is a demo showing OpenXR's hand tracking and controller tracking logic.
+## Requirements/Godot Addons
+godotopenxrvendors
+godot-xr-tools
+gdvosk
 
-Language: GDScript
-
-Renderer: Compatibility
-
-> [!NOTE]
->
 > This demo requires Godot 4.4 or later
 
 ## Screenshots
