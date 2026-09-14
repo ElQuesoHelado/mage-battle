@@ -11,8 +11,8 @@ func _ready() -> void:
 
 func _on_speech_recognizer_result(confidence: float, text: String) -> void:
 	print("result: ", text)
-	if text.to_lower().contains("mono"):
-		spawn_mono()
+	#if text.to_lower().contains("mono"):
+	spawn_mono()
 
 func _on_speech_recognizer_partial_result(text: String) -> void:
 	print("partial: ", text)

@@ -6587,7 +6587,6 @@ stream = SubResource("AudioStreamMicrophone_kp25g")
 bus = &"Record"
 
 [connection signal="partial_result" from="SpeechRecognizer" to="." method="_on_speech_recognizer_partial_result"]
-[connection signal="result" from="SpeechRecognizer" to="." method="_on_speech_recognizer_result"]
 
 [editable path="XROrigin3D/LeftHandMesh/LeftHandHumanoid2"]
 [editable path="XROrigin3D/RightHandMesh/RightHandHumanoid2"]
