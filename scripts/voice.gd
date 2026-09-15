@@ -40,7 +40,7 @@ func _process(_delta: float) -> void:
 		var alternatives = _recognizer.get_final_result().get("alternatives", [])
 		if alternatives.size() > 0:
 			var text: String = alternatives[0].get("text", "")
-			if text != "" and text.to_lower().contains("esperma"):
+			if text != "" and text.to_lower().contains("mono"):
 				spawn_mono()
 
 
