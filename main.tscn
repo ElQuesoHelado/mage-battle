@@ -15,10 +15,8 @@
 [ext_resource type="Script" uid="uid://c8se6x85kiiyr" path="res://scripts/wand_drawing.gd" id="9_074og"]
 [ext_resource type="Script" uid="uid://bttlqsrxcdfoc" path="res://scripts/mages_movement.gd" id="12_dg77c"]
 [ext_resource type="Script" uid="uid://dac5sum26jqxf" path="res://scripts/spell_caster.gd" id="14_cegan"]
-[ext_resource type="VoskModel" uid="uid://bxa473xlce0wj" path="res://assets/vosk-model-small-es-0.42.vosk" id="14_w48qg"]
 [ext_resource type="PackedScene" uid="uid://egtg3p38osqu" path="res://objects/fireball.tscn" id="15_82xsv"]
 [ext_resource type="PackedScene" uid="uid://cu178kamis5ac" path="res://objects/water_jet.tscn" id="16_getpj"]
-[ext_resource type="Script" uid="uid://cet8acagn853a" path="res://pickup/pickup_able_body.gd" id="19_cegan"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_eyx45"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -6607,19 +6605,9 @@ skeleton = NodePath("..")
 
 [node name="TOES-wgt" type="Node3D" parent="Wizards/Wizard4" unique_id=1236342702]
 
-[node name="SpeechRecognizer" type="SpeechRecognizer" parent="." unique_id=116187984]
-recording_bus_name = &"Record"
-vosk_model = ExtResource("14_w48qg")
-
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=2021679125]
 stream = SubResource("AudioStreamMicrophone_kp25g")
 bus = &"Record"
-
-[node name="PickupAbleBody3D" type="RigidBody3D" parent="." unique_id=307275125]
-script = ExtResource("19_cegan")
-metadata/_custom_type_script = "uid://cet8acagn853a"
-
-[connection signal="result" from="SpeechRecognizer" to="." method="_on_speech_recognizer_result"]
 
 [editable path="XROrigin3D/LeftHandMesh/LeftHandHumanoid2"]
 [editable path="XROrigin3D/RightHandMesh/RightHandHumanoid2"]
