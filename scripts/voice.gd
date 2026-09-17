@@ -40,20 +40,13 @@ func _process(_delta: float) -> void:
 		var alternatives = _recognizer.get_final_result().get("alternatives", [])
 		if alternatives.size() > 0:
 			var text: String = alternatives[0].get("text", "")
-			if text != "" and text.to_lower().contains("mono"):
+			if text == "":
+				return
+			text = text.to_lower()
+			if text.contains("mono"):
 				spawn_mono()
-
-
-#func _ready() -> void:
-	#player.play()
-
-#func _on_speech_recognizer_result(confidence: float, text: String) -> void:
-	#print("result: ", text)
-	##if text.to_lower().contains("mono"):
-	#spawn_mono()
-#
-#func _on_speech_recognizer_partial_result(text: String) -> void:
-	#print("partial: ", text)
+			if text.contains("fuego"):
+				spawn_mono()
 
 func spawn_mono() -> void:
 	var from := camera.global_transform.origin
