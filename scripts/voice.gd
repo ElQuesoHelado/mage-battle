@@ -23,6 +23,7 @@ func _ready() -> void:
 	var grammar := PackedStringArray([
 		"fuego",
 		"agua",
+		"mono",
 		"[unk]"
 	])
 
@@ -92,3 +93,5 @@ func _process(_delta: float) -> void:
 
 	elif text.contains("agua"):
 		word_recognized.emit("agua")
+	elif text.contains("mono"):
+		word_recognized.emit("mono")

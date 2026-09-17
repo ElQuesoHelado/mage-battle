@@ -718,6 +718,7 @@ mesh = SubResource("PlaneMesh_6hhse")
 
 [node name="RecenterInfo" type="Label3D" parent="Floor" unique_id=1101802641]
 transform = Transform3D(0.59873, 0, 0.800951, 0, 1, 0, -0.800951, 0, 0.59873, -1.76283, 1.50033, -0.380399)
+visible = false
 pixel_size = 0.003
 text = "If you are not facing the table,
 recenter your headset.
@@ -740,19 +741,24 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5)
 
 [node name="Box01" parent="Table" unique_id=607964254 instance=ExtResource("7_6sqt7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.941084, 0)
+visible = false
 
 [node name="Box02" parent="Table" unique_id=1677557311 instance=ExtResource("7_6sqt7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13752, 0.941084, 0)
+visible = false
 
 [node name="Box03" parent="Table" unique_id=77250749 instance=ExtResource("7_6sqt7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0746718, 1.06282, 0)
+visible = false
 
 [node name="LeftHandInfo" parent="Table" unique_id=1760315995 node_paths=PackedStringArray("fallback_mesh") instance=ExtResource("5_wlhtu")]
 transform = Transform3D(0.939693, -0.085635, 0.331126, 0, 0.968147, 0.25038, -0.34202, -0.23528, 0.909761, -0.713026, 0.8718, -0.309953)
+visible = false
 fallback_mesh = NodePath("../../XROrigin3D/LeftHandController/FullbackMesh")
 
 [node name="RightHandInfo" parent="Table" unique_id=166019423 node_paths=PackedStringArray("fallback_mesh") instance=ExtResource("5_wlhtu")]
 transform = Transform3D(0.939693, 0.085635, -0.331126, 0, 0.968147, 0.25038, 0.34202, -0.23528, 0.909761, 0.278022, 0.8718, -0.381943)
+visible = false
 hand = 1
 fallback_mesh = NodePath("../../XROrigin3D/RightHandController/FullbackMesh")
 

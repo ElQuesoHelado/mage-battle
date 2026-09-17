@@ -15,6 +15,9 @@ class_name SpellSystem
 @export var forward_offset: float = 0.1
 @export var cooldown_seconds: float = 0.4
 
+@export_group("Mono")
+@export var mono_mesh: Mesh = preload("res://assets/Orangutan.obj")
+
 var _cooldown_timer: float = 0.0
 
 var _pending_shape: String = ""
@@ -98,6 +101,12 @@ func _check_spell() -> void:
 		_pending_word
 	)
 
+	#print("RECONOCIDO: ",_pending_word)
+	if _pending_word == "mono":
+		_spawn_mono()
+		_clear_pending_spell()
+		return
+
 	if _pending_shape == "" or _pending_word == "":
 		return
 
@@ -123,7 +132,7 @@ func _check_spell() -> void:
 				spell_scene = water_jet_scene
 				spell_label = "water_jet"
 
-		"square":	
+		"square":
 			if _pending_word == "fuego" or _pending_word == "agua":
 				spell_scene = water_jet_scene
 				spell_label = "water_jet"
@@ -198,3 +207,47 @@ func _cast_projectile(scene: PackedScene, label: String) -> void:
 	projectile.launch(forward)
 
 	_cooldown_timer = cooldown_seconds
+	
+func _spawn_mono() -> void:
+	var camera := get_viewport().get_camera_3d()
+
+	if not camera:
+		push_error("[SpellSystem] no se encontró una cámara 3D")
+		return
+
+	var from := camera.global_transform.origin
+	var forward := -camera.global_transform.basis.z
+	var to := from + forward * 100.0
+
+	var space_state := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+
+	var result := space_state.intersect_ray(query)
+
+	if result.is_empty():
+		print("[SpellSystem] no se encontró superficie para el mono")
+		return
+
+	_create_mono_at(result.position)
+
+
+func _create_mono_at(pos: Vector3) -> void:
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.mesh = mono_mesh
+
+	var body := StaticBody3D.new()
+	body.global_transform.origin = pos
+
+	var collision_shape := CollisionShape3D.new()
+	collision_shape.shape = mono_mesh.create_trimesh_shape()
+
+	body.add_child(mesh_instance)
+	body.add_child(collision_shape)
+
+	get_tree().current_scene.add_child(body)
+
+	var camera := get_viewport().get_camera_3d()
+	if camera:
+		body.look_at(camera.global_transform.origin, Vector3.UP)
+
+	print("[SpellSystem] MONO creado en ", pos)
