@@ -789,15 +789,14 @@ skeleton = NodePath("../../LeftHandController")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.05, 0, 0)
 
 [node name="WandPivot" type="Node3D" parent="XROrigin3D/RightHandController" unique_id=507304734]
-transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 0, -0.03)
+transform = Transform3D(0.71569264, -0.6984153, -3.05287e-08, 3.821371e-15, 4.3711385e-08, -0.99999994, 0.69841534, 0.7156926, 3.1283918e-08, 0, -0.03, 0)
 
 [node name="WandMesh" type="MeshInstance3D" parent="XROrigin3D/RightHandController/WandPivot" unique_id=1836561310]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.075, 0)
 mesh = SubResource("CylinderMesh_5h11f")
 
-[node name="WandTip" type="Marker3D" parent="XROrigin3D/RightHandController/WandPivot/WandMesh" unique_id=1417401514 node_paths=PackedStringArray("xr_controller")]
+[node name="WandTip" type="Marker3D" parent="XROrigin3D/RightHandController/WandPivot/WandMesh" unique_id=1417401514]
 script = ExtResource("9_074og")
-xr_controller = NodePath("../../..")
 
 [node name="LeftHandMesh" type="XRNode3D" parent="XROrigin3D" unique_id=128183319]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1, -0.5)

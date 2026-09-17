@@ -1,13 +1,12 @@
 extends Node3D
 class_name WandDrawing
 
-@export var xr_controller: XRController3D
-@export var trigger_action: String = "trigger"
+## Ya no se usa XRController3D. Todo el input viene del hand tracker óptico.
+@export var hand_tracker_name: String = "/user/hand_tracker/right"
 
-@export var trigger_on_threshold: float = 0.6
-@export var trigger_off_threshold: float = 0.4
-
-@export var reference_forward_node: Node3D
+## Umbrales de "cierre de puño" (0 = mano abierta, 1 = puño totalmente cerrado)
+@export var fist_on_threshold: float = 0.2
+@export var fist_off_threshold: float = 0.1
 
 @export var min_point_distance: float = 0.02
 @export var min_points_for_shape: int = 10
@@ -16,11 +15,11 @@ class_name WandDrawing
 @export var draw_trail: bool = true
 @export var trail_material: StandardMaterial3D
 
-@export var hand_tracker_name: String = "/user/hand_tracker/right"
-
 ## Si es true, la bola sale en la dirección del dedo índice. Si es false,
 ## sale perpendicular al plano del dibujo (como un portal).
 @export var use_finger_direction_for_cast: bool = false
+
+@export var debug_log_trigger_state: bool = true
 
 signal shape_recognized(shape_name: String, points: Array)
 signal drawing_started
@@ -37,6 +36,7 @@ var _plane_normal: Vector3 = Vector3.FORWARD
 var _trail_mesh: MeshInstance3D
 var _immediate_mesh: ImmediateMesh
 var _hand_tracker: XRHandTracker
+var _debug_timer: float = 0.0
 
 const MAX_POINTS := 400
 
@@ -87,34 +87,80 @@ func get_aim_direction() -> Vector3:
 	return -global_transform.basis.z
 
 
-@export var debug_log_trigger_state: bool = true
-var _debug_timer: float = 0.0
+## Tamaño de la mano (muñeca -> metacarpo del dedo medio) usado para
+## normalizar las distancias y que el umbral funcione igual en manos
+## grandes o chicas.
+func _get_hand_scale() -> float:
+	var wrist := _hand_tracker.get_hand_joint_transform(XRHandTracker.HAND_JOINT_WRIST).origin
+	var middle_mcp := _hand_tracker.get_hand_joint_transform(XRHandTracker.HAND_JOINT_MIDDLE_FINGER_METACARPAL).origin
+	return max(wrist.distance_to(middle_mcp), 0.001)
+
+
+## Devuelve 0.0 (mano abierta) .. 1.0 (puño cerrado), calculado a partir
+## de qué tan cerca están las puntas de los dedos de la muñeca.
+func get_fist_closure() -> float:
+	if not _hand_tracker or not _hand_tracker.has_tracking_data:
+		return 0.0
+
+	var wrist := _hand_tracker.get_hand_joint_transform(XRHandTracker.HAND_JOINT_WRIST).origin
+	var scale := _get_hand_scale()
+
+	var tip_joints := [
+		XRHandTracker.HAND_JOINT_INDEX_FINGER_TIP,
+		XRHandTracker.HAND_JOINT_MIDDLE_FINGER_TIP,
+		XRHandTracker.HAND_JOINT_RING_FINGER_TIP,
+		XRHandTracker.HAND_JOINT_PINKY_FINGER_TIP,
+	]
+
+	var total_norm_dist := 0.0
+	for j in tip_joints:
+		var tip := _hand_tracker.get_hand_joint_transform(j).origin
+		total_norm_dist += wrist.distance_to(tip) / scale
+	var avg_norm_dist := total_norm_dist / tip_joints.size()
+
+	# Valores aproximados típicos: mano abierta ~2.2-2.6, puño cerrado ~1.0-1.4.
+	# AJUSTA estos dos números con los prints de debug de abajo si hace falta.
+	var open_ref := 2.3
+	var closed_ref := 1.1
+	return clamp(inverse_lerp(open_ref, closed_ref, avg_norm_dist), 0.0, 1.0)
+
+
+## Pone el nodo en la posición/orientación del dedo índice, tomando en
+## cuenta el XROrigin3D. Reemplaza el "seguir al controller" de antes.
+func _sync_transform_to_hand() -> void:
+	var origin_node := _find_xr_origin()
+	if not origin_node:
+		return
+	var index_tip := _hand_tracker.get_hand_joint_transform(XRHandTracker.HAND_JOINT_INDEX_FINGER_TIP)
+	global_transform = origin_node.global_transform * index_tip
 
 
 func _process(delta: float) -> void:
-	if not xr_controller:
-		push_warning("WandDrawing: falta asignar xr_controller en el inspector")
+	if not _hand_tracker or not _hand_tracker.has_tracking_data:
+		#print("No hand tracker")
 		return
 
-	var analog_value: float = xr_controller.get_float(trigger_action)
-	var is_pressed: bool = xr_controller.is_button_pressed(trigger_action)
+	_sync_transform_to_hand()
 
+	var closure := get_fist_closure()
+	
+	
 	var pressed: bool
 	if _is_drawing:
-		pressed = is_pressed or analog_value >= trigger_off_threshold
+		print(closure)
+		pressed = closure >= fist_off_threshold
 	else:
-		pressed = is_pressed or analog_value >= trigger_on_threshold
+		pressed = closure >= fist_on_threshold
 
 	if debug_log_trigger_state:
 		_debug_timer += delta
 		if _debug_timer >= 1.0:
 			_debug_timer = 0.0
-			#print("[WandDrawing][DEBUG] pressed=", pressed,
-				#" analog=", analog_value,
-				#" is_drawing=", _is_drawing,
-				#" puntos=", _points.size(),
-				#" tip_pos=", global_position,
-				#" aim=", get_aim_direction())
+			print("[WandDrawing][DEBUG] closure=", closure,
+				" pressed=", pressed,
+				" is_drawing=", _is_drawing,
+				" puntos=", _points.size(),
+				" tip_pos=", global_position)
 
 	if pressed and not _is_drawing:
 		_start_drawing()
@@ -162,9 +208,6 @@ func _finish_drawing() -> void:
 	if use_finger_direction_for_cast:
 		last_cast_direction = get_aim_direction()
 	else:
-		# La bola sale perpendicular al plano del dibujo, como un portal.
-		# Forzamos que la normal apunte hacia adelante (hacia donde mira
-		# la cámara), para que no dependa del sentido en que dibujaste.
 		var n := _plane_normal
 		var cam := get_viewport().get_camera_3d()
 		if cam and n.dot(-cam.global_transform.basis.z) < 0.0:
@@ -173,9 +216,6 @@ func _finish_drawing() -> void:
 
 	var path_length := _compute_path_length(_points)
 	print("[WandDrawing] FIN trazo: puntos=", _points.size(), " longitud=", path_length)
-	print("[WandDrawing][FIN] last_plane_normal=", last_plane_normal)
-	print("[WandDrawing][FIN] last_cast_direction=", last_cast_direction)
-	print("[WandDrawing][FIN] last_cast_origin=", last_cast_origin)
 
 	if _points.size() < min_points_for_shape or path_length < min_path_length:
 		print("[WandDrawing] trazo DESCARTADO")
