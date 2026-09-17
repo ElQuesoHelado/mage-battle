@@ -156,11 +156,11 @@ func _process(delta: float) -> void:
 		_debug_timer += delta
 		if _debug_timer >= 1.0:
 			_debug_timer = 0.0
-			print("[WandDrawing][DEBUG] closure=", closure,
-				" pressed=", pressed,
-				" is_drawing=", _is_drawing,
-				" puntos=", _points.size(),
-				" tip_pos=", global_position)
+			#print("[WandDrawing][DEBUG] closure=", closure,
+				#" pressed=", pressed,
+				#" is_drawing=", _is_drawing,
+				#" puntos=", _points.size(),
+				#" tip_pos=", global_position)
 
 	if pressed and not _is_drawing:
 		_start_drawing()
