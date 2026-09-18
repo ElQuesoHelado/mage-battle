@@ -1,10 +1,10 @@
 extends RigidBody3D
 class_name Fireball
 
-@export var speed: float = 12.0
+@export var speed: float = 6.0
 @export var damage: float = 25.0
-@export var lifetime_seconds: float = 5.0
-@export var radius: float = 0.08
+@export var lifetime_seconds: float = 10.0
+@export var radius: float = 0.12
 
 
 func _ready() -> void:
