@@ -1,0 +1,195 @@
+[gd_scene format=3 uid="uid://dsllxmicl5r2f"]
+
+[ext_resource type="Script" uid="uid://cg2pmo33dok31" path="res://scripts/intro.gd" id="1_wby50"]
+[ext_resource type="Script" uid="uid://dmwdpfwh7uxw" path="res://start_vr.gd" id="2_qn042"]
+[ext_resource type="PackedScene" uid="uid://daig77dk5yvhx" path="res://objects/table.tscn" id="3_0claw"]
+[ext_resource type="PackedScene" uid="uid://b37oxqwt8r28" path="res://objects/box.tscn" id="4_w1kjt"]
+[ext_resource type="PackedScene" uid="uid://b4ebsfoqnxu81" path="res://hand_info.tscn" id="5_s13lp"]
+[ext_resource type="Script" uid="uid://bl113ujd2uagj" path="res://hand_controller.gd" id="6_m4rpt"]
+[ext_resource type="PackedScene" uid="uid://ianki57jjusu" path="res://objects/Gem.tscn" id="6_wby50"]
+[ext_resource type="PackedScene" uid="uid://caospno4tdf1p" path="res://pickup/pickup_handler.tscn" id="7_mfxy6"]
+[ext_resource type="Script" uid="uid://c8se6x85kiiyr" path="res://scripts/wand_drawing.gd" id="8_nt247"]
+[ext_resource type="Script" uid="uid://dji5rxbje2en" path="res://hand_mesh.gd" id="9_7dpha"]
+[ext_resource type="PackedScene" uid="uid://3gjkc6qju2n3" path="res://assets/gltf/LeftHandHumanoid.gltf" id="10_ufrnv"]
+[ext_resource type="Script" uid="uid://dym3ekgbygprn" path="res://xr_hand_fallback_modifier_3d.gd" id="11_dt502"]
+[ext_resource type="PackedScene" uid="uid://bymg1qpy1tu2w" path="res://assets/gltf/RightHandHumanoid.gltf" id="12_1b3q5"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_eyx45"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+
+[sub_resource type="Sky" id="Sky_tsis2"]
+sky_material = SubResource("ProceduralSkyMaterial_eyx45")
+
+[sub_resource type="Environment" id="Environment_0xu52"]
+background_mode = 2
+sky = SubResource("Sky_tsis2")
+tonemap_mode = 4
+
+[sub_resource type="SphereMesh" id="SphereMesh_d5x0p"]
+radius = 0.01
+height = 0.02
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5h11f"]
+top_radius = 0.004
+bottom_radius = 0.008
+height = 0.15
+radial_segments = 8
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_h12gs"]
+size = Vector3(20, 1, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vu82c"]
+albedo_color = Color(0.13430521, 0.03212587, 0.0753384, 1)
+
+[sub_resource type="QuadMesh" id="QuadMesh_4ysnb"]
+size = Vector2(20, 20)
+orientation = 1
+
+[node name="Main" type="Node3D" unique_id=1288509691]
+script = ExtResource("1_wby50")
+
+[node name="StartVR" type="Node3D" parent="." unique_id=1237672918]
+script = ExtResource("2_qn042")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1067263153]
+environment = SubResource("Environment_0xu52")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=212839333]
+transform = Transform3D(0.397904, -0.794516, 0.458712, 0, 0.499998, 0.866026, -0.917427, -0.344595, 0.198951, 0, 5, 0)
+directional_shadow_max_distance = 10.0
+
+[node name="Table" parent="." unique_id=1938310904 instance=ExtResource("3_0claw")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5)
+
+[node name="Box01" parent="Table" unique_id=607964254 instance=ExtResource("4_w1kjt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.941084, 0)
+
+[node name="LeftHandInfo" parent="Table" unique_id=1760315995 node_paths=PackedStringArray("fallback_mesh") instance=ExtResource("5_s13lp")]
+transform = Transform3D(0.939693, -0.085635, 0.331126, 0, 0.968147, 0.25038, -0.34202, -0.23528, 0.909761, -0.713026, 0.8718, -0.309953)
+visible = false
+fallback_mesh = NodePath("../../XROrigin3D/LeftHandController/FullbackMesh")
+
+[node name="RightHandInfo" parent="Table" unique_id=166019423 node_paths=PackedStringArray("fallback_mesh") instance=ExtResource("5_s13lp")]
+transform = Transform3D(0.939693, 0.085635, -0.331126, 0, 0.968147, 0.25038, 0.34202, -0.23528, 0.909761, 0.278022, 0.8718, -0.381943)
+visible = false
+hand = 1
+fallback_mesh = NodePath("../../XROrigin3D/RightHandController/FullbackMesh")
+
+[node name="Gem" parent="Table" unique_id=462895499 instance=ExtResource("6_wby50")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22911048, 0.91546714, -0.03513503)
+
+[node name="XROrigin3D" type="XROrigin3D" parent="." unique_id=1143024626]
+
+[node name="XRCamera3D" type="XRCamera3D" parent="XROrigin3D" unique_id=1264073145]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+
+[node name="LeftHandController" type="XRController3D" parent="XROrigin3D" unique_id=1877387115]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1, -0.5)
+tracker = &"left_hand"
+pose = &"palm_pose"
+show_when_tracked = true
+script = ExtResource("6_m4rpt")
+
+[node name="FullbackMesh" type="MeshInstance3D" parent="XROrigin3D/LeftHandController" unique_id=1488260741]
+mesh = SubResource("SphereMesh_d5x0p")
+
+[node name="PickupHandler" parent="XROrigin3D/LeftHandController" unique_id=1692466426 instance=ExtResource("7_mfxy6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05, 0, 0)
+
+[node name="RightHandController" type="XRController3D" parent="XROrigin3D" unique_id=573945542]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, -0.5)
+tracker = &"right_hand"
+pose = &"palm_pose"
+show_when_tracked = true
+script = ExtResource("6_m4rpt")
+
+[node name="FullbackMesh" type="MeshInstance3D" parent="XROrigin3D/RightHandController" unique_id=237611828]
+mesh = SubResource("SphereMesh_d5x0p")
+skeleton = NodePath("../../LeftHandController")
+
+[node name="PickupHandler" parent="XROrigin3D/RightHandController" unique_id=287391616 instance=ExtResource("7_mfxy6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.05, 0, 0)
+
+[node name="WandPivot" type="Node3D" parent="XROrigin3D/RightHandController" unique_id=507304734]
+transform = Transform3D(0.71569264, -0.6984153, -3.05287e-08, 3.821371e-15, 4.3711385e-08, -0.99999994, 0.69841534, 0.7156926, 3.1283918e-08, 0, -0.03, 0)
+
+[node name="WandMesh" type="MeshInstance3D" parent="XROrigin3D/RightHandController/WandPivot" unique_id=1836561310]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.075, 0)
+mesh = SubResource("CylinderMesh_5h11f")
+
+[node name="WandTip" type="Marker3D" parent="XROrigin3D/RightHandController/WandPivot/WandMesh" unique_id=1417401514]
+script = ExtResource("8_nt247")
+
+[node name="LeftHandMesh" type="XRNode3D" parent="XROrigin3D" unique_id=128183319]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1, -0.5)
+tracker = &"/user/hand_tracker/left"
+script = ExtResource("9_7dpha")
+
+[node name="LeftHandHumanoid2" parent="XROrigin3D/LeftHandMesh" unique_id=1103021127 instance=ExtResource("10_ufrnv")]
+
+[node name="XRHandModifier3D" type="XRHandModifier3D" parent="XROrigin3D/LeftHandMesh/LeftHandHumanoid2/LeftHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(1103021127, 1125943770) index="1" unique_id=1973581196]
+
+[node name="XRHandFallbackModifier3D" type="SkeletonModifier3D" parent="XROrigin3D/LeftHandMesh/LeftHandHumanoid2/LeftHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(1103021127, 1125943770) index="2" unique_id=554109447]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("11_dt502")
+grip_action = "pickup"
+
+[node name="RightHandMesh" type="XRNode3D" parent="XROrigin3D" unique_id=84293060]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, -0.5)
+tracker = &"/user/hand_tracker/right"
+script = ExtResource("9_7dpha")
+hand = 1
+
+[node name="RightHandHumanoid2" parent="XROrigin3D/RightHandMesh" unique_id=90653821 instance=ExtResource("12_1b3q5")]
+
+[node name="XRHandModifier3D" type="XRHandModifier3D" parent="XROrigin3D/RightHandMesh/RightHandHumanoid2/RightHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(90653821, 1843288310) index="1" unique_id=1677190653]
+hand_tracker = &"/user/hand_tracker/right"
+
+[node name="XRHandFallbackModifier3D" type="SkeletonModifier3D" parent="XROrigin3D/RightHandMesh/RightHandHumanoid2/RightHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(90653821, 1843288310) index="2" unique_id=1145812469]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("11_dt502")
+grip_action = "pickup"
+
+[node name="Floor" type="StaticBody3D" parent="." unique_id=1871877723]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor" unique_id=1167791787]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("BoxShape3D_h12gs")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=1097116280]
+material_override = SubResource("StandardMaterial3D_vu82c")
+mesh = SubResource("QuadMesh_4ysnb")
+
+[editable path="XROrigin3D/LeftHandMesh/LeftHandHumanoid2"]
+[editable path="XROrigin3D/RightHandMesh/RightHandHumanoid2"]

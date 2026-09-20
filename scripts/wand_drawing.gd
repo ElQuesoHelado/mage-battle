@@ -1,6 +1,8 @@
 extends Node3D
 class_name WandDrawing
 
+const ShapeRecognizer = preload("res://scripts/shape_recognizer.gd")
+
 ## Ya no se usa XRController3D. Todo el input viene del hand tracker óptico.
 @export var hand_tracker_name: String = "/user/hand_tracker/right"
 
@@ -223,7 +225,7 @@ func _finish_drawing() -> void:
 		drawing_cancelled.emit()
 		return
 
-	var shape := ShapeRecognizer.recognize(_points, _plane_normal)
+	var shape: String = ShapeRecognizer.recognize(_points, _plane_normal)
 	print("[WandDrawing] figura reconocida: ", shape, " (", _points.size(), " puntos)")
 
 	shape_recognized.emit(shape, _points.duplicate())

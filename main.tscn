@@ -14,8 +14,10 @@
 [ext_resource type="Script" uid="uid://c8se6x85kiiyr" path="res://scripts/wand_drawing.gd" id="9_074og"]
 [ext_resource type="Script" uid="uid://bttlqsrxcdfoc" path="res://scripts/mages_movement.gd" id="12_dg77c"]
 [ext_resource type="Script" uid="uid://dac5sum26jqxf" path="res://scripts/spell_caster.gd" id="14_cegan"]
-[ext_resource type="PackedScene" uid="uid://egtg3p38osqu" path="res://objects/fireball.tscn" id="15_82xsv"]
-[ext_resource type="PackedScene" uid="uid://cu178kamis5ac" path="res://objects/water_jet.tscn" id="16_getpj"]
+[ext_resource type="PackedScene" uid="uid://bphj6pckfnfp4" path="res://scenes/fireball.tscn" id="14_vivmo"]
+[ext_resource type="PackedScene" uid="uid://dq82kxvtsbkqx" path="res://scenes/waterjet.tscn" id="15_2cqfq"]
+[ext_resource type="PackedScene" uid="uid://cgb3i6y4fhgiw" path="res://scenes/bolt.tscn" id="16_yaehf"]
+[ext_resource type="PackedScene" uid="uid://dhgfshqoxxx7l" path="res://scenes/rock.tscn" id="17_074og"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_eyx45"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -686,13 +688,13 @@ blend_shape_mode = 0
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_kp25g"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_h12gs"]
-size = Vector3(50, 1, 50)
+size = Vector3(60, 1, 60)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vu82c"]
 albedo_color = Color(0.15294118, 0.27058825, 0.11764706, 1)
 
 [sub_resource type="QuadMesh" id="QuadMesh_4ysnb"]
-size = Vector2(50, 50)
+size = Vector2(60, 60)
 orientation = 1
 
 [node name="Main" type="Node3D" unique_id=1288509691]
@@ -836,12 +838,13 @@ influence = 1.0
 script = ExtResource("8_gdsnk")
 grip_action = "pickup"
 
-[node name="SpellCaster" type="Node3D" parent="XROrigin3D" unique_id=1981080486 node_paths=PackedStringArray("wand_drawing", "wand_tip")]
+[node name="SpellCaster" type="Node3D" parent="XROrigin3D" unique_id=1981080486 node_paths=PackedStringArray("wand_tip")]
 script = ExtResource("14_cegan")
-wand_drawing = NodePath("../RightHandController/WandPivot/WandMesh/WandTip")
-wand_tip = NodePath("../RightHandController/WandPivot/WandMesh/WandTip")
-fireball_scene = ExtResource("15_82xsv")
-water_jet_scene = ExtResource("16_getpj")
+wand_tip = NodePath("../XRCamera3D")
+fireball_scene = ExtResource("14_vivmo")
+water_jet_scene = ExtResource("15_2cqfq")
+bolt_scene = ExtResource("16_yaehf")
+rock_scene = ExtResource("17_074og")
 
 [node name="Wizards" type="Node3D" parent="." unique_id=732644730]
 script = ExtResource("12_dg77c")

@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://cgb3i6y4fhgiw"]
+
+[ext_resource type="Script" uid="uid://d0i5op647cho" path="res://scripts/bolt.gd" id="1_gsnt5"]
+
+[node name="Bolt" type="RigidBody3D" unique_id=1812901425]
+script = ExtResource("1_gsnt5")

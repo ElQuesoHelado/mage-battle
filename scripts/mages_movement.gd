@@ -2,7 +2,7 @@ extends Node
 
 @export	var nodes: Array[Node3D] = []
 @export	var radius: float = 0.5
-@export	var speed: float = 6
+@export	var speed: float = 1
 
 var centers: Array[Vector3]=[]
 var angle: float =0.0
