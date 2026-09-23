@@ -46,6 +46,13 @@ albedo_color = Color(0.13430521, 0.03212587, 0.0753384, 1)
 size = Vector2(20, 20)
 orientation = 1
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wby50"]
+albedo_color = Color(0.22864965, 0.11088685, 0.4044804, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_h12gs"]
+material = SubResource("StandardMaterial3D_wby50")
+size = Vector3(0.5, 10, 15)
+
 [node name="Main" type="Node3D" unique_id=1288509691]
 script = ExtResource("1_wby50")
 
@@ -56,11 +63,12 @@ script = ExtResource("2_qn042")
 environment = SubResource("Environment_0xu52")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=212839333]
-transform = Transform3D(0.397904, -0.794516, 0.458712, 0, 0.499998, 0.866026, -0.917427, -0.344595, 0.198951, 0, 5, 0)
+transform = Transform3D(0.39790404, -0.79451615, 0.4587118, 0, 0.49999815, 0.8660265, -0.91742706, -0.34459543, 0.19895127, 0, 3.6293821, 0)
+light_color = Color(0.021434637, 0.021434635, 0.021434633, 1)
 directional_shadow_max_distance = 10.0
 
 [node name="Table" parent="." unique_id=1938310904 instance=ExtResource("3_0claw")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 15.84369)
 
 [node name="Box01" parent="Table" unique_id=607964254 instance=ExtResource("4_w1kjt")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.941084, 0)
@@ -77,7 +85,7 @@ hand = 1
 fallback_mesh = NodePath("../../XROrigin3D/RightHandController/FullbackMesh")
 
 [node name="Gem" parent="Table" unique_id=462895499 instance=ExtResource("6_wby50")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22911048, 0.91546714, -0.03513503)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22911048, 0.91546714, -17.184082)
 
 [node name="XROrigin3D" type="XROrigin3D" parent="." unique_id=1143024626]
 
@@ -190,6 +198,37 @@ shape = SubResource("BoxShape3D_h12gs")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=1097116280]
 material_override = SubResource("StandardMaterial3D_vu82c")
 mesh = SubResource("QuadMesh_4ysnb")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=1769808826]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=1414126865]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.498884, 0, 0)
+mesh = SubResource("BoxMesh_h12gs")
+
+[node name="StaticBody3D2" type="StaticBody3D" parent="." unique_id=1567330520]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D2" unique_id=1564998058]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.295488, 0, 0)
+mesh = SubResource("BoxMesh_h12gs")
+
+[node name="StaticBody3D3" type="StaticBody3D" parent="." unique_id=583563718]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D3" unique_id=1845773692]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.26425028, 0, 5.631009)
+mesh = SubResource("BoxMesh_h12gs")
+
+[node name="StaticBody3D4" type="StaticBody3D" parent="." unique_id=1686050264]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D4" unique_id=1131211474]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.064566135, 0, -4.712273)
+mesh = SubResource("BoxMesh_h12gs")
+
+[node name="StaticBody3D5" type="StaticBody3D" parent="." unique_id=1178882885]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 1.5667439, -1.8438902)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D5" unique_id=113646747]
+transform = Transform3D(-8.742278e-08, 0, 2, 0, 2, 0, -2, 0, -8.742278e-08, 0.064566135, 1.1920929e-07, -4.712273)
+mesh = SubResource("BoxMesh_h12gs")
 
 [editable path="XROrigin3D/LeftHandMesh/LeftHandHumanoid2"]
 [editable path="XROrigin3D/RightHandMesh/RightHandHumanoid2"]

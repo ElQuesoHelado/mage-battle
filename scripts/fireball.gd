@@ -58,6 +58,7 @@ func _create_visuals() -> void:
 	_create_trail()
 
 
+
 # ============================================================
 # CORE
 # ============================================================
@@ -293,13 +294,11 @@ func _has_child_of_type(t) -> bool:
 func _on_body_entered(body: Node) -> void:
 	if exploded:
 		return
-
 	if body == self:
 		return
-
 	if body.has_method("take_damage"):
 		body.take_damage(damage)
-
+		queue_free()
 	_explode()
 
 
