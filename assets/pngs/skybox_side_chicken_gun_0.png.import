@@ -2,18 +2,21 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://rotxjjot2ajc"
-path.s3tc="res://.godot/imported/background2.jpg-20d3edd96b3e306665c2220bbd10aa5d.s3tc.ctex"
-path.etc2="res://.godot/imported/background2.jpg-20d3edd96b3e306665c2220bbd10aa5d.etc2.ctex"
+uid="uid://rmoxc0r7h0jw"
+path.s3tc="res://.godot/imported/skybox_side_chicken_gun_0.png-b55e29fa453ddd48b1e4d6cc4368bdc2.s3tc.ctex"
+path.etc2="res://.godot/imported/skybox_side_chicken_gun_0.png-b55e29fa453ddd48b1e4d6cc4368bdc2.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
+generator_parameters={
+"md5": "263d34e354aba7dd87c963af522b8323"
+}
 
 [deps]
 
-source_file="res://assets/background2.jpg"
-dest_files=["res://.godot/imported/background2.jpg-20d3edd96b3e306665c2220bbd10aa5d.s3tc.ctex", "res://.godot/imported/background2.jpg-20d3edd96b3e306665c2220bbd10aa5d.etc2.ctex"]
+source_file="res://assets/pngs/skybox_side_chicken_gun_0.png"
+dest_files=["res://.godot/imported/skybox_side_chicken_gun_0.png-b55e29fa453ddd48b1e4d6cc4368bdc2.s3tc.ctex", "res://.godot/imported/skybox_side_chicken_gun_0.png-b55e29fa453ddd48b1e4d6cc4368bdc2.etc2.ctex"]
 
 [params]
 

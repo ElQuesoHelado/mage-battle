@@ -17,6 +17,7 @@ func _ready() -> void:
 	health = max_health
 	animation_tree.active = true
 	playback.start("idle")
+	add_to_group("mages")
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
@@ -53,6 +54,11 @@ func take_damage(amount: int = 1) -> void:
 func _die() -> void:
 	play_death()
 	died.emit()
+	
+	var main := get_tree().current_scene
+	if main and main.has_method("register_mage_kill"):
+		main.register_mage_kill()
+		
 	if animation_player and animation_player.has_animation("death"):
 		await animation_player.animation_finished
 	queue_free()

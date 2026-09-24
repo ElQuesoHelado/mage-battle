@@ -23,6 +23,8 @@ const ShapeRecognizer = preload("res://scripts/shape_recognizer.gd")
 
 @export var debug_log_trigger_state: bool = true
 
+@export var trail_width: float = 0.03  # 2 cm. Súbelo/bájalo al gusto
+
 signal shape_recognized(shape_name: String, points: Array)
 signal drawing_started
 signal drawing_cancelled
@@ -43,6 +45,7 @@ var _debug_timer: float = 0.0
 const MAX_POINTS := 400
 
 
+
 func _ready() -> void:
 	await get_tree().process_frame
 	_hand_tracker = XRServer.get_tracker(hand_tracker_name) as XRHandTracker
@@ -61,9 +64,15 @@ func _ready() -> void:
 func _default_trail_material() -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1.0, 0.6, 0.1)
+	mat.albedo_color = Color(1.0, 0.7, 0.2)
 	mat.emission_enabled = true
 	mat.emission = Color(1.0, 0.5, 0.0)
+	mat.emission_energy_multiplier = 4.0        # antes no lo tenías
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD   # mezcla aditiva = brillo
+	mat.disable_receive_shadows = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED          # <-- NUEVO: visible por ambos lados
+	mat.vertex_color_use_as_albedo = true                 # <-- NUEVO: usa el gradiente
 	return mat
 
 
@@ -193,13 +202,48 @@ func _update_trail() -> void:
 	if not draw_trail or not _immediate_mesh:
 		return
 	_immediate_mesh.clear_surfaces()
-	if _points.size() < 2:
+	var n := _points.size()
+	if n < 2:
 		return
-	_immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
-	for p in _points:
-		_immediate_mesh.surface_add_vertex(p)
-	_immediate_mesh.surface_end()
 
+	var half := trail_width * 0.5
+	var up := _plane_normal.normalized()
+	if up.length() < 0.001:
+		up = Vector3.UP
+
+	_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+
+	for i in n:
+		# Tangente: dirección del trazo en este punto
+		var tangent: Vector3
+		if i == 0:
+			tangent = _points[1] - _points[0]
+		elif i == n - 1:
+			tangent = _points[n - 1] - _points[n - 2]
+		else:
+			tangent = _points[i + 1] - _points[i - 1]
+
+		if tangent.length() < 0.0001:
+			tangent = Vector3.FORWARD
+		tangent = tangent.normalized()
+
+		# Perpendicular dentro del plano del dibujo
+		var perp := tangent.cross(up)
+		if perp.length() < 0.001:
+			perp = tangent.cross(Vector3.RIGHT)
+		perp = perp.normalized()
+
+		# Gradiente de color del inicio a la punta
+		var t := float(i) / float(n - 1)
+		var c := Color(1.0, 0.3, 0.0).lerp(Color(1.0, 1.0, 0.6), t)
+
+		# Dos vértices por punto: uno a cada lado
+		_immediate_mesh.surface_set_color(c)
+		_immediate_mesh.surface_add_vertex(_points[i] + perp * half)
+		_immediate_mesh.surface_set_color(c)
+		_immediate_mesh.surface_add_vertex(_points[i] - perp * half)
+
+	_immediate_mesh.surface_end()
 
 func _finish_drawing() -> void:
 	_is_drawing = false
