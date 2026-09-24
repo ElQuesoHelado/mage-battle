@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cscs862u177ol" path="res://scripts/voice.gd" id="1_ycdy4"]
 [ext_resource type="PackedScene" uid="uid://3gjkc6qju2n3" path="res://assets/gltf/LeftHandHumanoid.gltf" id="2_3hxem"]
 [ext_resource type="Script" uid="uid://dmwdpfwh7uxw" path="res://start_vr.gd" id="2_5rtkn"]
+[ext_resource type="Texture2D" uid="uid://dmlrq1yjbsy3l" path="res://assets/background.jpg" id="3_cegan"]
 [ext_resource type="PackedScene" uid="uid://bymg1qpy1tu2w" path="res://assets/gltf/RightHandHumanoid.gltf" id="3_oifi1"]
 [ext_resource type="PackedScene" uid="uid://caospno4tdf1p" path="res://pickup/pickup_handler.tscn" id="3_sg1io"]
 [ext_resource type="PackedScene" uid="uid://b4ebsfoqnxu81" path="res://hand_info.tscn" id="5_wlhtu"]
@@ -19,12 +20,11 @@
 [ext_resource type="PackedScene" uid="uid://dhgfshqoxxx7l" path="res://scenes/rock.tscn" id="17_074og"]
 [ext_resource type="PackedScene" uid="uid://bo7ccybskc15a" path="res://scenes/wizard.tscn" id="18_cegan"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_eyx45"]
-sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
-ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_82xsv"]
+panorama = ExtResource("3_cegan")
 
 [sub_resource type="Sky" id="Sky_tsis2"]
-sky_material = SubResource("ProceduralSkyMaterial_eyx45")
+sky_material = SubResource("PanoramaSkyMaterial_82xsv")
 
 [sub_resource type="Environment" id="Environment_0xu52"]
 background_mode = 2

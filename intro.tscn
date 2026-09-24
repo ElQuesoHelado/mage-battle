@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" uid="uid://3gjkc6qju2n3" path="res://assets/gltf/LeftHandHumanoid.gltf" id="10_ufrnv"]
 [ext_resource type="Script" uid="uid://dym3ekgbygprn" path="res://xr_hand_fallback_modifier_3d.gd" id="11_dt502"]
 [ext_resource type="PackedScene" uid="uid://bymg1qpy1tu2w" path="res://assets/gltf/RightHandHumanoid.gltf" id="12_1b3q5"]
+[ext_resource type="PackedScene" uid="uid://bdbae27ieum0l" path="res://scenes/mageIntro.tscn" id="14_xsd0a"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_eyx45"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -85,7 +86,7 @@ hand = 1
 fallback_mesh = NodePath("../../XROrigin3D/RightHandController/FullbackMesh")
 
 [node name="Gem" parent="Table" unique_id=462895499 instance=ExtResource("6_wby50")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22911048, 0.91546714, -17.184082)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.06973475, 0.91546714, -16.84754)
 
 [node name="XROrigin3D" type="XROrigin3D" parent="." unique_id=1143024626]
 
@@ -229,6 +230,9 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 1
 [node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D5" unique_id=113646747]
 transform = Transform3D(-8.742278e-08, 0, 2, 0, 2, 0, -2, 0, -8.742278e-08, 0.064566135, 1.1920929e-07, -4.712273)
 mesh = SubResource("BoxMesh_h12gs")
+
+[node name="mageIntro" parent="." unique_id=906681544 instance=ExtResource("14_xsd0a")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4503245)
 
 [editable path="XROrigin3D/LeftHandMesh/LeftHandHumanoid2"]
 [editable path="XROrigin3D/RightHandMesh/RightHandHumanoid2"]

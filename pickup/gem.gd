@@ -4,7 +4,7 @@ extends PickupAbleBody3D
 @export var scene_to_load: String = "res://main.tscn"
 
 @onready var light: OmniLight3D = $OmniLight3D
-@onready var anim: AnimationPlayer = $AnimationPlayer   # opcional
+#@onready var anim: AnimationPlayer = $AnimationPlayer   # opcional
 
 var _time := 0.0
 var _base_y := 0.0
@@ -48,8 +48,8 @@ func _on_picked_up() -> void:
 	_picked = true
 
 	# Animación de portal (si tienes AnimationPlayer en la escena)
-	if anim and anim.has_animation("portal"):
-		anim.play("portal")
+	#if anim and anim.has_animation("portal"):
+	#	anim.play("portal")
 
 	# Si usas partículas, actívalas
 	var particles := get_node_or_null("GPUParticles3D")
