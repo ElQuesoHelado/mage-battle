@@ -98,8 +98,8 @@ func _create_glow() -> void:
 	glow = MeshInstance3D.new()
 
 	var sphere := SphereMesh.new()
-	sphere.radius = radius * 1.8
-	sphere.height = radius * 3.6
+	sphere.radius = radius * 3.6
+	sphere.height = radius * 5.6
 
 	sphere.radial_segments = 12
 	sphere.rings = 6

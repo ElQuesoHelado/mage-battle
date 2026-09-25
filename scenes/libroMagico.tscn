@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://kk60jcub20ed"]
+
+[ext_resource type="PackedScene" uid="uid://0kyjle0m58x6" path="res://scenes/Pagina0.tscn" id="1_6mtce"]
+[ext_resource type="Script" uid="uid://bnqgjglvs7b52" path="res://scripts/libro_magico.gd" id="1_lqpto"]
+
+[node name="libroMagico" type="Node3D" unique_id=842342573]
+script = ExtResource("1_lqpto")
+
+[node name="Ancla" type="Node3D" parent="." unique_id=2123895657]
+
+[node name="Modelos" type="Node3D" parent="Ancla" unique_id=1797403263]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3671378, 0)
+
+[node name="Pagina0" parent="Ancla/Modelos" unique_id=234899018 instance=ExtResource("1_6mtce")]

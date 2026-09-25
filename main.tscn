@@ -13,7 +13,9 @@
 [ext_resource type="Script" uid="uid://dji5rxbje2en" path="res://hand_mesh.gd" id="7_yj2fr"]
 [ext_resource type="Script" uid="uid://dym3ekgbygprn" path="res://xr_hand_fallback_modifier_3d.gd" id="8_gdsnk"]
 [ext_resource type="Script" uid="uid://c8se6x85kiiyr" path="res://scripts/wand_drawing.gd" id="9_074og"]
+[ext_resource type="Script" uid="uid://cylveukqnvt3s" path="res://scripts/aim_indicator.gd" id="10_82xsv"]
 [ext_resource type="Script" uid="uid://dac5sum26jqxf" path="res://scripts/spell_caster.gd" id="14_cegan"]
+[ext_resource type="PackedScene" uid="uid://kk60jcub20ed" path="res://scenes/libroMagico.tscn" id="14_getpj"]
 [ext_resource type="PackedScene" uid="uid://bphj6pckfnfp4" path="res://scenes/fireball.tscn" id="14_vivmo"]
 [ext_resource type="PackedScene" uid="uid://dq82kxvtsbkqx" path="res://scenes/waterjet.tscn" id="15_2cqfq"]
 [ext_resource type="PackedScene" uid="uid://cgb3i6y4fhgiw" path="res://scenes/bolt.tscn" id="16_yaehf"]
@@ -139,6 +141,10 @@ mesh = SubResource("CylinderMesh_5h11f")
 [node name="WandTip" type="Marker3D" parent="XROrigin3D/RightHandController/WandPivot/WandMesh" unique_id=1417401514]
 script = ExtResource("9_074og")
 
+[node name="helper" type="Node3D" parent="XROrigin3D/RightHandController/WandPivot/WandMesh/WandTip" unique_id=639479067]
+transform = Transform3D(0.7156927, 1.7763573e-15, 0.6984154, -0.69841546, 4.3711392e-08, 0.71569276, -3.0528707e-08, -1.0000001, 3.128393e-08, -0.00863862, 0.6320541, 0.97000015)
+script = ExtResource("10_82xsv")
+
 [node name="LeftHandMesh" type="XRNode3D" parent="XROrigin3D" unique_id=128183319]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1, -0.5)
 tracker = &"/user/hand_tracker/left"
@@ -167,6 +173,9 @@ active = true
 influence = 1.0
 script = ExtResource("8_gdsnk")
 grip_action = "pickup"
+
+[node name="libroMagico" parent="XROrigin3D/LeftHandMesh" unique_id=842342573 instance=ExtResource("14_getpj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.571558)
 
 [node name="RightHandMesh" type="XRNode3D" parent="XROrigin3D" unique_id=84293060]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, -0.5)
