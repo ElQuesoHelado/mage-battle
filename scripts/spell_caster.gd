@@ -1,8 +1,66 @@
 extends Node3D
 class_name SpellSystem
 
-@export var wand_drawing: WandDrawing
-@export var wand_tip: Node3D
+## Director de la batalla. Se ocupa de tres cosas:
+##   1. saber si el jugador está en un altar,
+##   2. lanzar el hechizo que el jugador dice por la voz,
+##   3. llevar la cuenta de bajas e invocar al jefe gigante.
+
+# -----------------------------------------------------------------
+# Datos de los elementos
+# -----------------------------------------------------------------
+
+## Ciclo de debilidades: cada elemento es débil al que le sigue.
+## fuego → agua → rayo → tierra → fuego
+const WEAK_CYCLE := {
+	"fuego":  "agua",
+	"agua":   "rayo",
+	"rayo":   "tierra",
+	"tierra": "fuego",
+}
+
+const LABEL := {
+	"fuego": "FUEGO",
+	"agua": "AGUA",
+	"rayo": "RAYO",
+	"tierra": "TIERRA",
+}
+
+const COLOR := {
+	"fuego":  Color(1.00, 0.35, 0.08),
+	"agua":   Color(0.15, 0.55, 1.00),
+	"rayo":   Color(1.00, 0.90, 0.25),
+	"tierra": Color(0.60, 0.38, 0.16),
+}
+
+## Texto corto que resume la regla, para el HUD.
+const RULE_TEXT := "FUEGO→AGUA · AGUA→RAYO · RAYO→TIERRA · TIERRA→FUEGO"
+const ENERGY_TEXT := "Dibuja círculos para encender el ALTAR MAYOR"
+
+
+static func label_of(element: String) -> String:
+	return LABEL.get(element, element.to_upper())
+
+
+static func color_of(element: String) -> Color:
+	return COLOR.get(element, Color.WHITE)
+
+
+## Elemento al que es vulnerable "element". Cadena vacía si no aplica.
+static func weakness_of(element: String) -> String:
+	return WEAK_CYCLE.get(element, "")
+
+
+## Texto de una weakness, listo para el HUD.
+static func weakness_text(weak: String) -> String:
+	if weak.is_empty():
+		return "cualquiera"
+	return label_of(weak)
+
+
+# -----------------------------------------------------------------
+# Exportaciones
+# -----------------------------------------------------------------
 
 @export_group("Hechizos")
 @export var fireball_scene: PackedScene
@@ -10,218 +68,367 @@ class_name SpellSystem
 @export var bolt_scene: PackedScene
 @export var rock_scene: PackedScene
 
+@export_group("Altares")
+## Altar Mayor: el único que habilita el lanzamiento. Su energía la
+## recarga el jugador dibujando círculos.
+@export var major_altar: AltarMayor
+@export var cast_cost: float = 10.0
+## En false se puede hechizar sin energía. Sólo para depurar.
+@export var require_energy: bool = true
+
+@export_group("Jefe gigante")
+@export var giant_scene: PackedScene
+@export var giant_max_health: int = 14
+@export var giant_scale: float = 2.6
+## Distancia a la que aparece el jefe, por delante del jugador.
+@export var giant_spawn_distance: float = 4.5
+@export var giant_cleanup_delay: float = 2.0
+
 @export_group("Ajustes")
-@export var shape_window_seconds: float = 5.0
-@export var cooldown_seconds: float = 0.4
+@export var cooldown_seconds: float = 0.35
+## Cuánto se adelanta el hechizo respecto a la cámara, para que salga
+## de la mano y no de la cara.
+@export var cast_offset: float = 0.45
+## Tope de hechizos vivos a la vez. Cada uno arrastra 2-3 sistemas de
+## partículas, que es lo caro de verdad en un Quest 2. Con 4 hay
+## bastante visualmente sin hundir el frame rate.
+@export var max_projectiles: int = 4
 
 @export_group("Mono")
 @export var mono_mesh: Mesh = preload("res://assets/Orangutan.obj")
-## Techo de monos vivos: evita que alguien invoque 500 y revente la
-## memoria del Quest.
 @export var mono_max_count: int = 12
 
 @export_group("HUD VR")
 @export var hud_distance: float = 1.2
-@export var hud_font_size: int = 96
-@export var debug_font_size: int = 32
-## Volcado de estado interno (shape/word/hits) bajo el texto principal.
+@export var hud_font_size: int = 64
 @export var show_debug_hud: bool = false
-## Avisos breves al jugador ("decí la palabra", "esa figura es de...").
-@export var feedback_seconds: float = 3.0
+@export var feedback_seconds: float = 3.5
 
-const SPELL_TABLE := {
-	"fuego": "circle",
-	"agua":  "triangle",
-	"rayo": "bolt",
-	"roca": "lt",
-}
+# -----------------------------------------------------------------
+# Estado
+# -----------------------------------------------------------------
 
-const SHAPE_LABEL := {
-	"circle":    "FUEGO",
-	"triangle": "AGUA",
-	"bolt":   "RAYO",
-	"lt": "ROCA",
-}
-
-var _pending_shape: String = ""
-var _shape_timestamp: float = -INF
-var _cooldown_timer: float = 0.0
-var _last_word: String = ""
-var _signal_hits: int = 0
+var _altars: Array[Node] = []
+var _cooldown: float = 0.0
+var _giant_spawned: bool = false
+var _finished: bool = false
 
 var _feedback: String = ""
 var _feedback_timestamp: float = -INF
 
 var _voice_source: Node
 var _hud: Label3D
-var _debug_hud: Label3D
 var _hud_anchor: Node3D
-
-# Cachés: reasignar el texto de un Label3D regenera su malla, así que
-# solo se toca cuando el string cambia de verdad.
 var _hud_cache: String = ""
-var _debug_cache: String = ""
-var _debug_timer: float = 0.0
+## El texto del HUD sólo se reconstruye cuando algo lo invalida.
+## Antes se armaba la cadena y el Array cada frame.
+var _hud_dirty: bool = true
+## Último porcentaje pintado en la barra, para no reescribirla cada
+## frame mientras la energía se drena.
+var _hud_pct: int = -1
 
-# El "mono" reutiliza la misma malla y el mismo shape: crear un
-# trimesh nuevo por cada invocación era el grueso del coste.
 var _mono_shape: ConcavePolygonShape3D
 var _mono_bodies: Array[Node] = []
 
 
+# -----------------------------------------------------------------
+# Arranque
+# -----------------------------------------------------------------
+
 func _ready() -> void:
+	# El grupo es la vía por la que los magos encuentran al director
+	# sin depender de la posición en el árbol: register_mage_kill() ya
+	# no está en la raíz de la escena, sino aquí.
+	add_to_group("spell_system")
 	_setup_hud()
+	_connect_voice()
+	# Diferido a propósito: el Altar Mayor y la varita son hermanos y su
+	# _ready() corre después del nuestro, así que en este punto todavía
+	# no se han registrado en sus grupos y el NodePath exportado puede
+	# no haber resuelto. Un frame más tarde todo está en su sitio y el
+	# orden en el archivo deja de importar.
+	_connect_altar.call_deferred()
 
-	# Si no está asignado en el inspector, lo buscamos en la escena.
-	if not wand_drawing:
-		wand_drawing = _find_wand_drawing()
 
-	if wand_drawing:
-		var err := wand_drawing.shape_recognized.connect(_on_shape_recognized)
-		if err != OK:
-			push_error("[SpellSystem] no se pudo conectar shape_recognized (%d)" % err)
+func _connect_altar() -> void:
+	if major_altar == null or not is_instance_valid(major_altar):
+		# Si no se asignó a mano, se busca por tipo en la escena.
+		var found := get_tree().get_first_node_in_group("altar_mayor")
+		if found is AltarMayor:
+			major_altar = found
+	if major_altar == null or not is_instance_valid(major_altar):
+		push_error("[SpellSystem] falta el AltarMayor: no se podrá lanzar")
+		return
+
+	if not major_altar.energy_gained.is_connected(_on_energy_gained):
+		major_altar.energy_gained.connect(_on_energy_gained)
+
+	# El círculo se dibuja con la varita, que cuelga del mando derecho.
+	var wand := get_tree().get_first_node_in_group("wand_drawing")
+	if wand != null and wand.has_signal("circle_drawn"):
+		if not wand.circle_drawn.is_connected(_on_circle_drawn):
+			wand.circle_drawn.connect(_on_circle_drawn)
 	else:
-		push_error("[SpellSystem] NO encontré ningún WandDrawing en la escena")
+		push_warning("[SpellSystem] no se encontró WandDrawing: el círculo no recargará")
 
+
+func _connect_voice() -> void:
 	_voice_source = get_tree().current_scene
-	if _voice_source and _voice_source.has_signal("word_recognized"):
+	if _voice_source != null and _voice_source.has_signal("word_recognized"):
 		_voice_source.word_recognized.connect(_on_word_recognized)
 	else:
-		push_error("[SpellSystem] escena principal sin 'word_recognized'")
+		push_error("[SpellSystem] la escena principal no expone 'word_recognized'")
 
 
-func _find_wand_drawing() -> WandDrawing:
-	var root := get_tree().current_scene
-	if not root:
-		return null
-	return _find_recursive(root) as WandDrawing
+# -----------------------------------------------------------------
+# Bucle
+# -----------------------------------------------------------------
+
+func _process(delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam != null and _hud_anchor != null:
+		_hud_anchor.global_transform = cam.global_transform
+
+	if _cooldown > 0.0:
+		_cooldown -= delta
+		if _cooldown <= 0.0:
+			_hud_dirty = true
+
+	# El aviso del jugador caduca solo.
+	if _feedback != "" \
+			and Time.get_ticks_msec() / 1000.0 - _feedback_timestamp > feedback_seconds:
+		_feedback = ""
+		_hud_dirty = true
+
+	# La barra de energía se repinta sólo cuando cambia el porcentaje
+	# entero. Con el drenaje continuo cambia en cada frame, y rehacer
+	# el texto del HUD 90 veces por segundo no es gratis.
+	if major_altar != null and is_instance_valid(major_altar):
+		var pct := int(round(major_altar.get_fill() * 100.0))
+		if pct != _hud_pct:
+			_hud_pct = pct
+			_hud_dirty = true
+
+	if _hud_dirty:
+		_hud_dirty = false
+		_set_hud(_build_hud_text())
 
 
-func _find_recursive(n: Node) -> Node:
-	if n is WandDrawing:
-		return n
-	for c in n.get_children():
-		var r := _find_recursive(c)
-		if r:
-			return r
-	return null
+# -----------------------------------------------------------------
+# Círculo → energía
+# -----------------------------------------------------------------
 
-
-func _on_shape_recognized(shape_name: String, _points: Array) -> void:
-	_signal_hits += 1
-	var s := shape_name.to_lower()
-
-	if s == "" or s == "unknown":
-		_set_feedback("No reconocí esa figura")
+func _on_circle_drawn() -> void:
+	if major_altar == null or not is_instance_valid(major_altar):
 		return
+	major_altar.add_circle()
 
-	# "star" y "heart" las reconoce el reconocedor pero no son hechizo.
-	if not SHAPE_LABEL.has(s):
-		_set_feedback("%s no es un hechizo" % s.to_upper())
-		return
 
-	_pending_shape = s
-	_shape_timestamp = Time.get_ticks_msec() / 1000.0
-	_set_feedback("Decí: %s" % SHAPE_LABEL[s])
+func _on_energy_gained(amount: float) -> void:
+	_set_feedback("+%.0f de energía" % amount)
 
+
+# -----------------------------------------------------------------
+# Voz → hechizo
+# -----------------------------------------------------------------
 
 func _on_word_recognized(word: String) -> void:
 	var w := word.to_lower().strip_edges()
-	_last_word = w
 
 	if w == "mono":
 		_spawn_mono()
 		return
 
-	if not SPELL_TABLE.has(w):
+	if not LABEL.has(w):
 		return
 
-	if _pending_shape == "":
-		_set_feedback("Primero dibujá una figura")
+	if _finished:
 		return
 
-	var now := Time.get_ticks_msec() / 1000.0
-	if now - _shape_timestamp > shape_window_seconds:
-		_clear_pending_shape()
-		_set_feedback("Se pasó el tiempo, dibujá de nuevo")
+	if require_energy:
+		if major_altar == null or not is_instance_valid(major_altar):
+			_set_feedback("No hay Altar Mayor")
+			return
+		if not major_altar.is_online():
+			_set_feedback("Sin energía: dibuja un círculo en el aire")
+			return
+		if major_altar.energia < cast_cost:
+			_set_feedback("Energía insuficiente (%d)" % int(major_altar.energia))
+			return
+
+	if _cooldown > 0.0:
 		return
 
-	var expected: String = SPELL_TABLE[w]
-	if _pending_shape != expected:
-		_set_feedback("Esa figura no es de %s" % w.to_upper())
+	# Tope de proyectiles: preferimos un aviso a hundir el frame rate.
+	if get_tree().get_nodes_in_group("projectiles").size() >= max_projectiles:
+		_set_feedback("Demasiados hechizos en vuelo")
 		return
 
-	if _cooldown_timer > 0.0:
+	_cast(w)
+
+
+func _cast(element: String) -> void:
+	var scene := _scene_for(element)
+	if scene == null:
+		_set_feedback("Falta la escena de %s" % label_of(element))
 		return
 
-	_cast_spell(w)
-	_clear_pending_shape()
-
-
-func _process(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
-	if cam and _hud_anchor:
-		_hud_anchor.global_transform = cam.global_transform
+	if cam == null:
+		_set_feedback("No hay camara")
+		return
 
-	if _cooldown_timer > 0.0:
-		_cooldown_timer -= delta
+	var projectile := scene.instantiate() as Node3D
+	if projectile == null or not projectile.has_method("launch"):
+		_set_feedback("La escena de %s no tiene launch()" % label_of(element))
+		return
 
-	var now := Time.get_ticks_msec() / 1000.0
+	# El hechizo sale disparado en la dirección en la que está
+	# mirando la cámara en ese instante.
+	var forward: Vector3 = -cam.global_transform.basis.z
+	var origin: Vector3 = cam.global_position + forward * cast_offset
+
+	get_tree().current_scene.add_child(projectile)
+	projectile.global_position = origin
+	projectile.launch(forward)
+
+	# Se cobra la energía sólo cuando el hechizo sale de verdad.
+	if major_altar != null and is_instance_valid(major_altar):
+		major_altar.spend(cast_cost)
+
+	_cooldown = cooldown_seconds
+	_set_feedback("¡%s!" % label_of(element))
+
+
+func _scene_for(element: String) -> PackedScene:
+	match element:
+		"fuego":
+			return fireball_scene
+		"agua":
+			return water_jet_scene
+		"rayo":
+			return bolt_scene
+		"tierra":
+			return rock_scene
+	return null
+
+
+# -----------------------------------------------------------------
+# Jefes y fin de partida
+# -----------------------------------------------------------------
+
+## Lo llama wizard.gd cuando un mago se muere. El mago ya se ha
+## retirado del grupo "mages" en ese punto, así que un grupo vacío
+## significa "no queda ningún elemental normal".
+func register_mage_kill() -> void:
+	if _finished:
+		return
+	if _giant_spawned:
+		_finish()
+		return
+	if get_tree().get_nodes_in_group("mages").is_empty():
+		_spawn_giant()
+
+
+func _spawn_giant() -> void:
+	if _giant_spawned:
+		return
+	if giant_scene == null:
+		push_error("[SpellSystem] falta giant_scene; no se puede invocar al jefe")
+		_finish()
+		return
+
+	var cam := get_viewport().get_camera_3d()
+	var forward: Vector3 = Vector3.FORWARD
+	if cam != null:
+		forward = -cam.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length() < 0.01:
+		forward = Vector3.FORWARD
+	forward = forward.normalized()
+
+	var origin := Vector3.ZERO
+	if cam != null:
+		origin = cam.global_position
+	var pos: Vector3 = origin + forward * giant_spawn_distance
+	pos.y = 0.0
+
+	var giant: Node3D = giant_scene.instantiate()
+	get_tree().current_scene.add_child(giant)
+	giant.global_position = pos
+	# El jefe mira al jugador, no al revés.
+	if origin.distance_to(pos) > 0.01:
+		giant.look_at(origin, Vector3.UP)
+
+	# weakness_element vacío => inmune a las debilidades: cualquier
+	# elemento le hace daño.
+	giant.max_health = giant_max_health
+	giant.death_cleanup_delay = giant_cleanup_delay
+	giant.health = giant_max_health
+	giant.shrinks_on_damage = true
+	giant.base_scale = Vector3.ONE * giant_scale
+	giant.scale = giant.base_scale
+
+	_giant_spawned = true
+	_set_feedback("¡El GRAN MAGO se alza! Aguanta lo que sea.")
+
+
+func _finish() -> void:
+	_finished = true
+	# call_deferred: register_mage_kill() llega desde un body_entered, o
+	# sea desde el paso de física. Cambiar de escena ahí empieza a
+	# liberar los cuerpos y los que quedan reciben take_damage() sin
+	# estar ya en el árbol.
+	get_tree().call_deferred("change_scene_to_file", "res://outro.tscn")
+
+
+# -----------------------------------------------------------------
+# HUD
+# -----------------------------------------------------------------
+
+func _build_hud_text() -> String:
 	var lines: Array[String] = []
 
-	if _pending_shape != "":
-		var remaining := shape_window_seconds - (now - _shape_timestamp)
-		if remaining <= 0.0:
-			_clear_pending_shape()
-		else:
-			lines.append(SHAPE_LABEL.get(_pending_shape, _pending_shape.to_upper()))
-			lines.append("%.1fs · decí la palabra" % remaining)
+	if _giant_spawned and not _finished:
+		lines.append("GRAN MAGO: aguanta cualquier elemento")
+
+	lines.append(_energy_line())
 
 	if _feedback != "":
-		if now - _feedback_timestamp > feedback_seconds:
-			_feedback = ""
-		else:
-			lines.append(_feedback)
+		lines.append(_feedback)
 
-	_set_hud("\n".join(lines))
-	_update_debug_hud(now)
+	return "\n".join(lines)
+
+
+## Barra de energía con 8 bloques. Es texto plano, no geometría, así que
+## no cuesta nada de FPS.
+func _energy_line() -> String:
+	if major_altar == null or not is_instance_valid(major_altar):
+		return "Sin Altar Mayor"
+
+	var fill: float = major_altar.get_fill()
+	var lit := int(round(fill * 8.0))
+	var bar := "▮".repeat(lit) + "▯".repeat(8 - lit)
+	var pct := int(round(fill * 100.0))
+
+	if not major_altar.is_online():
+		return "ALTAR MAYOR APAGADO  %s  %d%%" % [bar, pct]
+	return "ALTAR MAYOR  %s  %d%%" % [bar, pct]
 
 
 func _set_hud(text: String) -> void:
-	if text == _hud_cache:
+	# Reasignar el text de un Label3D regenera su malla: sólo se toca
+	# cuando el string cambia de verdad.
+	if text == _hud_cache or _hud == null:
 		return
 	_hud_cache = text
 	_hud.text = text
 
 
-func _update_debug_hud(now: float) -> void:
-	if not _debug_hud:
-		return
-	_debug_hud.visible = show_debug_hud
-	if not show_debug_hud:
-		return
-
-	# Volcado a ~4 Hz: es información de depuración, no HUD.
-	_debug_timer -= get_process_delta_time()
-	if _debug_timer > 0.0:
-		return
-	_debug_timer = 0.25
-
-	var lines: Array[String] = []
-	lines.append("shape: '%s'" % _pending_shape)
-	lines.append("word:  '%s'" % _last_word)
-	lines.append("hits:  %d" % _signal_hits)
-	if _pending_shape != "":
-		lines.append("timer: %.1fs"
-			% (shape_window_seconds - (now - _shape_timestamp)))
-	if not wand_drawing:
-		lines.append("wand: NULL")
-
-	var text := "\n".join(lines)
-	if text == _debug_cache:
-		return
-	_debug_cache = text
-	_debug_hud.text = text
+func _set_feedback(msg: String) -> void:
+	_feedback = msg
+	_feedback_timestamp = Time.get_ticks_msec() / 1000.0
+	_hud_dirty = true
 
 
 func _setup_hud() -> void:
@@ -231,103 +438,41 @@ func _setup_hud() -> void:
 
 	_hud = Label3D.new()
 	_hud.font_size = hud_font_size
-	_hud.outline_size = 32
+	_hud.outline_size = 24
 	_hud.modulate = Color(1, 1, 1)
 	_hud.outline_modulate = Color(0, 0, 0)
 	_hud.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_hud.no_depth_test = true
 	_hud.fixed_size = true
 	_hud.pixel_size = 0.001
-	_hud.position = Vector3(0, 0.25, -hud_distance)
+	_hud.position = Vector3(0, 0.28, -hud_distance)
 	_hud.text = ""
 	_hud_anchor.add_child(_hud)
 
-	_debug_hud = Label3D.new()
-	_debug_hud.font_size = debug_font_size
-	_debug_hud.outline_size = 8
-	_debug_hud.modulate = Color(0.6, 1, 0.6)
-	_debug_hud.outline_modulate = Color(0, 0, 0)
-	_debug_hud.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_debug_hud.no_depth_test = true
-	_debug_hud.fixed_size = true
-	_debug_hud.pixel_size = 0.001
-	_debug_hud.position = Vector3(0, -0.15, -hud_distance)
-	_debug_hud.text = ""
-	# Apagado salvo que show_debug_hud se active a mano.
-	_debug_hud.visible = false
-	_hud_anchor.add_child(_debug_hud)
-
-
-func _clear_pending_shape() -> void:
-	_pending_shape = ""
-	_shape_timestamp = -INF
-
-
-func _cast_spell(word: String) -> void:
-	match word:
-		"fuego":
-			_cast_projectile(fireball_scene, "FUEGO")
-		"agua":
-			_cast_projectile(water_jet_scene, "AGUA")
-		"rayo":
-			_cast_projectile(bolt_scene, "RAYO")
-		"roca":
-			_cast_projectile(rock_scene, "ROCA")
-
-
-func _cast_projectile(scene: PackedScene, label: String) -> void:
-	if not wand_tip:
-		_set_feedback("Falta wand_tip en el inspector")
-		return
-	if not scene:
-		_set_feedback("Falta la escena de %s" % label)
-		return
-
-	var projectile := scene.instantiate() as Node3D
-	if projectile == null or not projectile.has_method("launch"):
-		_set_feedback("La escena de %s no tiene launch()" % label)
-		return
-
-	var forward: Vector3
-	var origin: Vector3
-	if wand_drawing and wand_drawing.last_cast_direction.length() > 0.001:
-		forward = wand_drawing.last_cast_direction
-		origin = wand_drawing.last_cast_origin
-	else:
-		forward = -wand_tip.global_transform.basis.z
-		origin = wand_tip.global_position
-
-	get_tree().current_scene.add_child(projectile)
-	projectile.global_position = origin + forward * 0.1
-	projectile.launch(forward)
-
-	_cooldown_timer = cooldown_seconds
-	_set_feedback("¡%s!" % label)
-
 
 # -----------------------------------------------------------------
-# Mono
+# Mono (detalle)
 # -----------------------------------------------------------------
 
 func _spawn_mono() -> void:
-	var camera := get_viewport().get_camera_3d()
-	if not camera:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
 		return
 
-	var from := camera.global_transform.origin
-	var to := from + (-camera.global_transform.basis.z) * 100.0
+	var from := cam.global_position
+	var to: Vector3 = from + (-cam.global_transform.basis.z) * 100.0
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	var result := get_world_3d().direct_space_state.intersect_ray(query)
 	if result.is_empty():
 		_set_feedback("No veo dónde ponerlo")
 		return
 
-	_create_mono_at(result.position, camera.global_transform.origin)
+	_create_mono_at(result.position, from)
 	_set_feedback("¡Mono invocado!")
 
 
 func _create_mono_at(pos: Vector3, look_from: Vector3) -> void:
-	if not mono_mesh:
+	if mono_mesh == null:
 		return
 
 	# El shape se crea una sola vez y se comparte entre todos los monos.
@@ -358,7 +503,6 @@ func _create_mono_at(pos: Vector3, look_from: Vector3) -> void:
 
 func _mono_material() -> StandardMaterial3D:
 	# El .obj viene sin .mtl, así que la superficie sale sin material.
-	# Se asigna uno aquí para que no se vea negro puro.
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.42, 0.30, 0.20)
 	mat.roughness = 0.9
@@ -374,13 +518,6 @@ func _prune_monos() -> void:
 		_mono_bodies.erase(m)
 
 	while _mono_bodies.size() >= mono_max_count:
-		# pop_front() devuelve Variant en un Array tipado, así que el tipo
-		# se declara explícito (si no, el aviso de inferencia es error).
 		var oldest: Node = _mono_bodies.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
-
-
-func _set_feedback(msg: String) -> void:
-	_feedback = msg
-	_feedback_timestamp = Time.get_ticks_msec() / 1000.0

@@ -4,6 +4,9 @@ class_name Fireball
 @export var speed: float = 12.0
 ## Daño en puntos de vida. Ver wizard.gd:max_health para el balance.
 @export var damage: int = 1
+## Elemento que representa este hechizo. Lo usa wizard.gd para
+## comprobar si el impacto es su debilidad.
+@export_enum("fuego", "agua", "rayo", "tierra") var element: String = "fuego"
 @export var lifetime_seconds: float = 5.0
 @export var radius: float = 0.20
 
@@ -12,12 +15,13 @@ var launch_direction := Vector3.FORWARD
 
 var core: MeshInstance3D
 var glow: MeshInstance3D
-var light: OmniLight3D
 var particles: GPUParticles3D
 var trail: GPUParticles3D
 
 
 func _ready() -> void:
+	# Grupo para que SpellSystem pueda limitar cuántos hay en vuelo.
+	add_to_group("projectiles")
 	gravity_scale = 0.0
 	continuous_cd = true
 	contact_monitor = true
@@ -54,7 +58,6 @@ func launch(direction: Vector3) -> void:
 func _create_visuals() -> void:
 	_create_core()
 	_create_glow()
-	_create_light()
 	_create_fire_particles()
 	_create_trail()
 
@@ -124,30 +127,13 @@ func _create_glow() -> void:
 
 
 # ============================================================
-# LIGHT
-# ============================================================
-
-func _create_light() -> void:
-	light = OmniLight3D.new()
-
-	light.light_color = Color(1.0, 0.35, 0.08)
-	light.light_energy = 1.5
-	light.omni_range = 2.5
-
-	# Importante para Quest 2.
-	light.shadow_enabled = false
-
-	add_child(light)
-
-
-# ============================================================
 # FIRE PARTICLES
 # ============================================================
 
 func _create_fire_particles() -> void:
 	particles = GPUParticles3D.new()
 
-	particles.amount = 24
+	particles.amount = 12
 	particles.lifetime = 0.35
 	particles.randomness = 0.45
 
@@ -205,7 +191,7 @@ func _create_fire_particles() -> void:
 func _create_trail() -> void:
 	trail = GPUParticles3D.new()
 
-	trail.amount = 18
+	trail.amount = 10
 	trail.lifetime = 0.30
 	trail.randomness = 0.25
 
@@ -298,7 +284,7 @@ func _on_body_entered(body: Node) -> void:
 	if body == self:
 		return
 	if body.has_method("take_damage"):
-		body.take_damage(damage)
+		body.take_damage(damage, element)
 	# La explosión es la que programa el borrado: si además se hiciera
 	# queue_free() aquí, el proyectil desaparecería sin efecto de impacto.
 	_explode()
@@ -335,7 +321,7 @@ func _explode() -> void:
 func _create_impact_effect() -> void:
 	var impact_particles := GPUParticles3D.new()
 
-	impact_particles.amount = 20
+	impact_particles.amount = 14
 	impact_particles.lifetime = 0.35
 	impact_particles.one_shot = true
 
@@ -388,18 +374,9 @@ func _create_impact_effect() -> void:
 
 	impact_particles.emitting = true
 
-	# Flash de luz en el impacto.
-	var impact_light := OmniLight3D.new()
-
-	impact_light.light_color = Color(1.0, 0.35, 0.05)
-	impact_light.light_energy = 5.0
-	impact_light.omni_range = 3.0
-	impact_light.shadow_enabled = false
-
-	get_parent().add_child(impact_light)
-
-	impact_light.global_position = global_position
-
-	get_tree().create_timer(0.08).timeout.connect(
-		impact_light.queue_free
-	)
+	# El destello del impacto ya no es una OmniLight3D. Todos los
+	# materiales de la bola son UNSHADED, así que la luz no iluminaba
+	# el hechizo: sólo alumbraba la geometría de alrededor, y cada luz
+	# extra se paga en cada superficie iluminada de la escena. Con tres
+	# bolas en vuelo eran seis luces y la escena se desplomaba. El mismo
+	# efecto se consigue con las partículas de impacto, que no cuestan.

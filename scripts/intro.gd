@@ -3,11 +3,6 @@ extends Node3D
 @onready var wizard: Node3D = $mageIntro
 @onready var gem: RigidBody3D = $Table/Gem
 
-## Si el jugador no recoge la gema en este tiempo, la escena avanza
-## sola. Evita que la intro se convierta en un callejón sin salida.
-@export var auto_advance_seconds: float = 20.0
-@export var next_scene: String = "res://main.tscn"
-
 var _time := 0.0
 var _gem_base_y := 0.0
 var _gem_active := false
@@ -31,9 +26,6 @@ func _ready() -> void:
 	gem.gravity_scale = 0.0
 	_gem_base_y = gem.global_position.y
 
-	if auto_advance_seconds > 0.0:
-		_auto_advance()
-
 
 func _process(delta: float) -> void:
 	if not _gem_active or gem == null:
@@ -55,9 +47,3 @@ func _show_gem() -> void:
 	var tween := create_tween()
 	tween.tween_property(gem, "scale", Vector3.ONE, 0.4) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-func _auto_advance() -> void:
-	await get_tree().create_timer(auto_advance_seconds).timeout
-	if is_inside_tree():
-		get_tree().change_scene_to_file(next_scene)

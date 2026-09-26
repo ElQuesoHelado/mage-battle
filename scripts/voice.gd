@@ -3,10 +3,12 @@ extends Node3D
 @onready var player := $AudioStreamPlayer as AudioStreamPlayer
 
 signal word_recognized(word: String)
-signal game_finished
 
 # --- Configuración del juego ---
-const MAGES_TO_WIN      := 3
+## Los magos se teletransportan cada cierto tiempo. Apagado por
+## defecto: con el sistema de debilidades hay que apuntar a un mago
+## concreto, y moverlos cada 10 s lo vuelve injugable.
+@export var teleport_enabled: bool = false
 const TELEPORT_INTERVAL := 10.0
 const TELEPORT_RADIUS   := 8.0
 @export var teleport_center := Vector3.ZERO
@@ -28,19 +30,18 @@ var _effect: AudioEffectCapture
 var _recognizer := VoskRecognizer.new()
 var _speaking := false
 var _silence_run := 0
-var _mage_kills := 0
-var _game_over := false
 
 
 func _ready() -> void:
 	player.play()
 
-	# --- Timer de teletransporte ---
-	var tp_timer := Timer.new()
-	tp_timer.wait_time = TELEPORT_INTERVAL
-	tp_timer.autostart = true
-	tp_timer.timeout.connect(_teleport_mages)
-	add_child(tp_timer)
+	# --- Timer de teletransporte (opcional) ---
+	if teleport_enabled:
+		var tp_timer := Timer.new()
+		tp_timer.wait_time = TELEPORT_INTERVAL
+		tp_timer.autostart = true
+		tp_timer.timeout.connect(_teleport_mages)
+		add_child(tp_timer)
 
 	# ─── LIBRO: configurar y conectar ANTES de Vosk ─────────
 	# (así aunque Vosk falle, el libro igual queda conectado)
@@ -56,6 +57,7 @@ func _ready() -> void:
 	else:
 		mano_izquierda.pinch_entered.connect(_on_pinch_entered)
 		mano_izquierda.pinch_exited.connect(_on_pinch_exited)
+		mano_izquierda.tree_exited.connect(_on_mano_izquierda_gone)
 
 	# --- Vosk ---
 	var model := load(
@@ -68,7 +70,7 @@ func _ready() -> void:
 	)
 
 	var grammar := PackedStringArray([
-		"fuego", "agua", "rayo", "roca", "mono", "[unk]"
+		"fuego", "agua", "rayo", "tierra", "roca", "mono", "[unk]"
 	])
 
 	var error := _recognizer.setup_with_grammar(model, mix_rate, grammar)
@@ -104,10 +106,15 @@ func _on_pinch_exited() -> void:
 	libro.cerrar()
 
 
-# -------- Teletransporte --------
+## Al cambiar de escena la mano izquierda se libera. Sin esta guarda,
+# un pinch_exited emitido durante la transición llegaría a un libro que
+# ya no existe.
+func _on_mano_izquierda_gone() -> void:
+	mano_izquierda = null
+
+
+# -------- Teletransporte (opcional) --------
 func _teleport_mages() -> void:
-	if _game_over:
-		return
 	var mages := get_tree().get_nodes_in_group("mages")
 	if mages.is_empty():
 		return
@@ -119,23 +126,6 @@ func _teleport_mages() -> void:
 		mage.global_position = teleport_center + Vector3(
 			cos(angle) * dist, 0.0, sin(angle) * dist
 		)
-
-
-# -------- Conteo de kills --------
-func register_mage_kill() -> void:
-	if _game_over:
-		return
-	_mage_kills += 1
-	if debug_prints:
-		print("Magos eliminados: %d / %d" % [_mage_kills, MAGES_TO_WIN])
-	if _mage_kills >= MAGES_TO_WIN:
-		_finish_game()
-
-
-func _finish_game() -> void:
-	_game_over = true
-	game_finished.emit()
-	get_tree().change_scene_to_file("res://outro.tscn")
 
 
 # -------- Vosk --------
@@ -182,16 +172,18 @@ func _end_utterance() -> void:
 	if debug_prints:
 		print("[VoiceRecognizer] reconocido: ", text)
 
-	# El orden importa: "tierra" y "roca" se comprueban antes que
-	# "mono" para que una frase que contenga ambas no se truncate.
+	# "tierra" y "roca" son el mismo elemento: se acepta cualquiera de
+	# las dos palabras, pero siempre se emite la clave canónica.
 	if text.contains("fuego"):
 		word_recognized.emit("fuego")
 	elif text.contains("agua"):
 		word_recognized.emit("agua")
 	elif text.contains("rayo"):
 		word_recognized.emit("rayo")
+	elif text.contains("tierra"):
+		word_recognized.emit("tierra")
 	elif text.contains("roca"):
-		word_recognized.emit("roca")
+		word_recognized.emit("tierra")
 	elif text.contains("mono"):
 		word_recognized.emit("mono")
 

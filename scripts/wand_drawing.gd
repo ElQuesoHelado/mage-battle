@@ -21,11 +21,34 @@ const ShapeRecognizer = preload("res://scripts/shape_recognizer.gd")
 ## sale perpendicular al plano del dibujo (como un portal).
 @export var use_finger_direction_for_cast: bool = false
 
+## El reconector de figuras es caro (compara contra 6 plantillas con
+## 32 desplazamientos y 2 direcciones cada una). Con el lanzamiento por
+## voz en los altares el resultado ya no se usa, así que va apagado: el
+## rastro de luz del puño se sigue dibujando igual.
+@export var recognize_shapes: bool = false
+
 @export var debug_log_trigger_state: bool = false
 
 @export var trail_width: float = 0.03  # 2 cm. Súbelo/bájalo al gusto
 
+## Reconoce el círculo al soltar el puño. Es lo que recarga el altar
+## mayor. Usa recognize_circle_only(), que sólo prueba esa plantilla.
+@export var recognize_circle: bool = true
+
+## Umbral de aceptación del círculo. Negativo = usar
+## ShapeRecognizer.CIRCLE_THRESHOLD. Súbelo si en el visor resulta
+## demasiado exigente y el círculo no se reconoce.
+@export var circle_threshold: float = -1.0
+
+## Malla de la varita. Si se deja vacía se usa el nodo padre, que es lo
+## normal (WandTip cuelga de WandMesh).
+@export var mesh_to_toggle: Node3D
+
+## La varita sólo se ve cuando está empuñada. Con false se ve siempre.
+@export var show_only_when_gripped: bool = true
+
 signal shape_recognized(shape_name: String, points: Array)
+signal circle_drawn
 signal drawing_started
 signal drawing_cancelled
 
@@ -41,16 +64,25 @@ var _trail_mesh: MeshInstance3D
 var _immediate_mesh: ImmediateMesh
 var _hand_tracker: XRHandTracker
 var _debug_timer: float = 0.0
+var _wand_mesh: Node3D
 
 const MAX_POINTS := 400
 
 
 
 func _ready() -> void:
+	# El director de hechizos busca la varita por este grupo para
+	# conectar el círculo que recarga el Altar Mayor.
+	add_to_group("wand_drawing")
 	await get_tree().process_frame
 	_hand_tracker = XRServer.get_tracker(hand_tracker_name) as XRHandTracker
 	if not _hand_tracker:
 		push_warning("WandDrawing: no se encontró XRHandTracker '%s'" % hand_tracker_name)
+
+	if show_only_when_gripped:
+		_wand_mesh = mesh_to_toggle if mesh_to_toggle != null else (get_parent() as Node3D)
+		if _wand_mesh != null:
+			_wand_mesh.visible = false
 
 	if draw_trail:
 		# El rastro es top_level, así que se cuelga de la escena para que
@@ -159,6 +191,13 @@ func _process(delta: float) -> void:
 	_sync_transform_to_hand()
 
 	var closure := get_fist_closure()
+
+	# La varita aparece al empuñarla y desaparece al soltarla, con el
+	# mismo umbral que dispara el dibujo.
+	if _wand_mesh != null:
+		var gripped := closure >= fist_on_threshold
+		if _wand_mesh.visible != gripped:
+			_wand_mesh.visible = gripped
 
 	# Histéresis: se empieza a dibujar con un puño más cerrado del que
 	# hace falta para soltar. Sin esto el trazo parpadea al borde del
@@ -269,9 +308,16 @@ func _finish_drawing() -> void:
 		drawing_cancelled.emit()
 		return
 
-	var shape: String = ShapeRecognizer.recognize(_points, _plane_normal)
+	if recognize_shapes:
+		var shape: String = ShapeRecognizer.recognize(_points, _plane_normal)
+		shape_recognized.emit(shape, _points.duplicate())
 
-	shape_recognized.emit(shape, _points.duplicate())
+	if recognize_circle:
+		var threshold: float = circle_threshold if circle_threshold > 0.0 \
+			else ShapeRecognizer.CIRCLE_THRESHOLD
+		if ShapeRecognizer.recognize_circle_only(_points, _plane_normal, threshold):
+			circle_drawn.emit()
+
 	_clear_trail()
 
 

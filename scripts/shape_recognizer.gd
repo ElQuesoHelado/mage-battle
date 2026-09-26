@@ -14,6 +14,15 @@ extends RefCounted
 const N := 32
 const MATCH_THRESHOLD := 0.20
 
+## Umbral para el círculo del Altar Mayor. Más estricto que
+## MATCH_THRESHOLD a propósito: medido sobre figuras sintéticas, un
+## círculo perfecto puntúa 0.004, un cuadrado 0.087, un triángulo 0.178
+## y una "L" 0.184. Con 0.20 el altar se encendería con cualquier
+## figura cerrada. 0.12 separa el círculo del resto con margen para
+## el temblor de la mano; si en el visor resulta demasiado exigente,
+## súbelo desde wand_drawing.gd.
+const CIRCLE_THRESHOLD := 0.12
+
 ## Poner a true para volcar los scores por figura. En un visor esto
 ## genera decenas de líneas por segundo, así que va apagado.
 const DEBUG := false
@@ -23,13 +32,7 @@ static func recognize(points_3d: Array[Vector3], plane_normal: Vector3) -> Strin
 	if points_3d.size() < 6:
 		return "unknown"
 
-	var centroid := Vector3.ZERO
-	for p in points_3d:
-		centroid += p
-	centroid /= points_3d.size()
-
-	var pts := _project_to_plane(points_3d, plane_normal, centroid)
-	pts = _normalize(_resample(pts, N))
+	var pts := _prepare(points_3d, plane_normal)
 
 	var templates := _get_templates()
 	var best_name := "unknown"
@@ -51,6 +54,77 @@ static func recognize(points_3d: Array[Vector3], plane_normal: Vector3) -> Strin
 		print("[ShapeRecognizer] elegido=%s (%.3f, umbral=%.3f)"
 			% [result, best_score, MATCH_THRESHOLD])
 	return result
+
+
+## Versión barata de recognize(): sólo compara contra la plantilla del
+## círculo. La de arriba prueba 6 plantillas x 32 desplazamientos x 2
+## direcciones; esta hace una sexta parte de ese trabajo, que es lo
+## único que necesita el altar mayor para recargarse.
+static func recognize_circle_only(
+		points_3d: Array[Vector3], plane_normal: Vector3,
+		threshold: float = CIRCLE_THRESHOLD,
+		max_radius_cv: float = 0.30) -> bool:
+	if points_3d.size() < 6:
+		return false
+
+	var pts := _prepare(points_3d, plane_normal)
+	var tmpl: PackedVector2Array = _normalize(_resample(_make_circle(), N))
+	var score := _best_match_distance(pts, tmpl)
+	if score >= threshold:
+		if DEBUG:
+			print("[ShapeRecognizer] circulo rechazado: score %.3f" % score)
+		return false
+
+	# El score sólo no basta: un cuadrado puntúa bien. La dispersión de
+	# los radios descarta los polígonos.
+	var cv := radius_cv(pts)
+	if DEBUG:
+		print("[ShapeRecognizer] circulo score %.3f  cv %.3f" % [score, cv])
+	return cv <= max_radius_cv
+
+
+## Segunda comprobación del círculo: sus puntos están todos a la misma
+## distancia del centro. Un cuadrado puntúa 0.087 contra la plantilla y
+## se colaría por el umbral, pero su radio varía mucho. Esta métrica es
+## la que lo descarta.
+##
+## Devuelve el coeficiente de variación de los radios: 0 es un
+## circunferencia perfecta.
+static func radius_cv(points_2d: PackedVector2Array) -> float:
+	if points_2d.size() < 8:
+		return INF
+
+	var cx := 0.0
+	var cy := 0.0
+	for p in points_2d:
+		cx += p.x
+		cy += p.y
+	cx /= float(points_2d.size())
+	cy /= float(points_2d.size())
+
+	var mean := 0.0
+	for p in points_2d:
+		mean += Vector2(p.x - cx, p.y - cy).length()
+	mean /= float(points_2d.size())
+	if mean < 0.0001:
+		return INF
+
+	var acc := 0.0
+	for p in points_2d:
+		var d: float = Vector2(p.x - cx, p.y - cy).length() - mean
+		acc += d * d
+	return sqrt(acc / float(points_2d.size())) / mean
+
+
+## Proyección al plano, remuestreo a N puntos y normalización. Se
+## extrajo para que recognize() y recognize_circle_only() partan del
+## mismo preprocesado y no se duplique.
+static func _prepare(points_3d: Array[Vector3], plane_normal: Vector3) -> PackedVector2Array:
+	var centroid := Vector3.ZERO
+	for p in points_3d:
+		centroid += p
+	centroid /= points_3d.size()
+	return _normalize(_resample(_project_to_plane(points_3d, plane_normal, centroid), N))
 
 
 # ---------------------------------------------------------------------------

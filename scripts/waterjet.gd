@@ -5,6 +5,9 @@ class_name WaterJet
 @export var speed: float = 16.0
 ## Daño en puntos de vida. Ver wizard.gd:max_health para el balance.
 @export var damage: int = 1
+## Elemento que representa este hechizo. Lo usa wizard.gd para
+## comprobar si el impacto es su debilidad.
+@export_enum("fuego", "agua", "rayo", "tierra") var element: String = "agua"
 @export var lifetime_seconds: float = 2.5
 @export var radius: float = 0.15
 
@@ -20,6 +23,8 @@ var spray: GPUParticles3D
 
 
 func _ready() -> void:
+	# Grupo para que SpellSystem pueda limitar cuántos hay en vuelo.
+	add_to_group("projectiles")
 	gravity_scale = 0.0
 	continuous_cd = true
 	contact_monitor = true
@@ -204,7 +209,7 @@ func _create_foam() -> void:
 func _create_droplets() -> void:
 	droplets = GPUParticles3D.new()
 
-	droplets.amount = 26
+	droplets.amount = 10
 	droplets.lifetime = 0.45
 	droplets.randomness = 0.65
 	droplets.local_coords = true
@@ -273,7 +278,7 @@ func _create_droplets() -> void:
 func _create_spray() -> void:
 	spray = GPUParticles3D.new()
 
-	spray.amount = 18
+	spray.amount = 8
 	spray.lifetime = 0.35
 	spray.randomness = 0.45
 	spray.local_coords = true
@@ -425,7 +430,7 @@ func _on_body_entered(body: Node) -> void:
 		return
 
 	if body.has_method("take_damage"):
-		body.take_damage(damage)
+		body.take_damage(damage, element)
 
 	_explode()
 
@@ -461,7 +466,7 @@ func _create_water_splash() -> void:
 
 	var splash := GPUParticles3D.new()
 
-	splash.amount = 38
+	splash.amount = 18
 	splash.lifetime = 0.55
 	splash.one_shot = true
 	splash.explosiveness = 0.9

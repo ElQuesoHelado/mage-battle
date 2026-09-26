@@ -5,6 +5,9 @@ class_name Rock
 ## Daño en puntos de vida. La roca es el hechizo más lento pero el
 ## único que reparte 2 puntos, así que mata en la mitad de golpes.
 @export var damage: int = 2
+## Elemento que representa este hechizo. Lo usa wizard.gd para
+## comprobar si el impacto es su debilidad.
+@export_enum("fuego", "agua", "rayo", "tierra") var element: String = "tierra"
 @export var lifetime_seconds: float = 6.0
 @export var radius: float = 0.22
 
@@ -16,6 +19,8 @@ var debris: GPUParticles3D
 
 
 func _ready() -> void:
+	# Grupo para que SpellSystem pueda limitar cuántos hay en vuelo.
+	add_to_group("projectiles")
 	# A diferencia de fuego/agua/rayo, la roca SÍ cae.
 	gravity_scale = 1.8
 	mass = 4.0
@@ -77,7 +82,7 @@ func _create_core() -> void:
 
 func _create_debris() -> void:
 	debris = GPUParticles3D.new()
-	debris.amount = 8
+	debris.amount = 6
 	debris.lifetime = 0.6
 	debris.randomness = 0.6
 	debris.local_coords = true
@@ -136,7 +141,7 @@ func _on_body_entered(body: Node) -> void:
 	if body == self:
 		return
 	if body.has_method("take_damage"):
-		body.take_damage(damage)
+		body.take_damage(damage, element)
 	_explode()
 
 
@@ -159,7 +164,7 @@ func _explode() -> void:
 
 func _create_impact_effect() -> void:
 	var impact := GPUParticles3D.new()
-	impact.amount = 30
+	impact.amount = 16
 	impact.lifetime = 0.7
 	impact.one_shot = true
 

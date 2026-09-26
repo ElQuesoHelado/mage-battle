@@ -4,6 +4,9 @@ class_name Bolt
 @export var speed: float = 28.0
 ## Daño en puntos de vida. Ver wizard.gd:max_health para el balance.
 @export var damage: int = 1
+## Elemento que representa este hechizo. Lo usa wizard.gd para
+## comprobar si el impacto es su debilidad.
+@export_enum("fuego", "agua", "rayo", "tierra") var element: String = "rayo"
 @export var lifetime_seconds: float = 1.5
 @export var radius: float = 0.10
 
@@ -12,12 +15,13 @@ var launch_direction := Vector3.FORWARD
 
 var core: MeshInstance3D
 var glow: MeshInstance3D
-var light: OmniLight3D
 var sparks: GPUParticles3D
 var trail: GPUParticles3D
 
 
 func _ready() -> void:
+	# Grupo para que SpellSystem pueda limitar cuántos hay en vuelo.
+	add_to_group("projectiles")
 	gravity_scale = 0.0
 	continuous_cd = true
 	contact_monitor = true
@@ -55,7 +59,6 @@ func launch(direction: Vector3) -> void:
 func _create_visuals() -> void:
 	_create_core()
 	_create_glow()
-	_create_light()
 	_create_sparks()
 	_create_trail()
 
@@ -105,18 +108,9 @@ func _create_glow() -> void:
 	add_child(glow)
 
 
-func _create_light() -> void:
-	light = OmniLight3D.new()
-	light.light_color = Color(1.0, 0.95, 0.6)
-	light.light_energy = 2.5
-	light.omni_range = 3.5
-	light.shadow_enabled = false
-	add_child(light)
-
-
 func _create_sparks() -> void:
 	sparks = GPUParticles3D.new()
-	sparks.amount = 18
+	sparks.amount = 10
 	sparks.lifetime = 0.25
 	sparks.randomness = 0.7
 	sparks.local_coords = true
@@ -155,7 +149,7 @@ func _create_sparks() -> void:
 
 func _create_trail() -> void:
 	trail = GPUParticles3D.new()
-	trail.amount = 26
+	trail.amount = 12
 	trail.lifetime = 0.20
 	trail.randomness = 0.3
 	trail.local_coords = true
@@ -228,7 +222,7 @@ func _on_body_entered(body: Node) -> void:
 	if body == self:
 		return
 	if body.has_method("take_damage"):
-		body.take_damage(damage)
+		body.take_damage(damage, element)
 	_explode()
 
 
@@ -251,7 +245,7 @@ func _explode() -> void:
 
 func _create_impact_effect() -> void:
 	var impact_particles := GPUParticles3D.new()
-	impact_particles.amount = 22
+	impact_particles.amount = 14
 	impact_particles.lifetime = 0.3
 	impact_particles.one_shot = true
 
@@ -287,12 +281,7 @@ func _create_impact_effect() -> void:
 	impact_particles.finished.connect(impact_particles.queue_free)
 	impact_particles.emitting = true
 
-	# Flash blanco (más fuerte y corto que fuego).
-	var impact_light := OmniLight3D.new()
-	impact_light.light_color = Color(1.0, 1.0, 0.8)
-	impact_light.light_energy = 7.0
-	impact_light.omni_range = 4.0
-	impact_light.shadow_enabled = false
-	get_parent().add_child(impact_light)
-	impact_light.global_position = global_position
-	get_tree().create_timer(0.06).timeout.connect(impact_light.queue_free)
+	# El flash blanco del impacto ya no es una OmniLight3D: los
+	# materiales del rayo son UNSHADED, así que la luz no iluminaba el
+	# propio rayo y sólo encarecía cada superficie de la escena. Las
+	# partículas de impacto dan el mismo destello sin coste de luces.

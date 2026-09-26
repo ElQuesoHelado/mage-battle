@@ -5,7 +5,13 @@ extends Node3D
 @export var fallback_mesh : Node3D
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta):
+func _process(_delta):
+	# Estas instancias están visibles = false en la escena, pero su
+	# _process seguía activo: se reconstruía el texto y se consultaban
+	# los trackers 90 veces por segundo sin que nadie lo viera.
+	if not is_visible_in_tree():
+		return
+
 	var text = ""
 
 	if hand == 0:

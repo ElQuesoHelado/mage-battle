@@ -3,8 +3,9 @@
 [ext_resource type="PackedScene" uid="uid://0kyjle0m58x6" path="res://scenes/Pagina0.tscn" id="1_6mtce"]
 [ext_resource type="Script" uid="uid://bnqgjglvs7b52" path="res://scripts/libro_magico.gd" id="1_lqpto"]
 
-[node name="libroMagico" type="Node3D" unique_id=842342573]
+[node name="libroMagico" type="Node3D" node_paths=PackedStringArray("texto_reglas") unique_id=842342573]
 script = ExtResource("1_lqpto")
+texto_reglas = NodePath("Ancla/TextoReglas")
 
 [node name="Ancla" type="Node3D" parent="." unique_id=2123895657]
 
@@ -12,3 +13,15 @@ script = ExtResource("1_lqpto")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3671378, 0)
 
 [node name="Pagina0" parent="Ancla/Modelos" unique_id=234899018 instance=ExtResource("1_6mtce")]
+
+[node name="TextoReglas" type="Label3D" parent="Ancla" unique_id=842342574]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+pixel_size = 0.0012
+billboard = 1
+no_depth_test = true
+fixed_size = true
+text = "Debilidades"
+font_size = 64
+outline_size = 20
+modulate = Color(1, 0.9, 0.6, 1)
+outline_modulate = Color(0, 0, 0, 1)
