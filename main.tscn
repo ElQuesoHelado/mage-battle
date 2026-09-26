@@ -60,8 +60,10 @@ albedo_color = Color(0.15294118, 0.27058825, 0.11764706, 1)
 size = Vector2(60, 60)
 orientation = 1
 
-[node name="Main" type="Node3D" unique_id=1288509691]
+[node name="Main" type="Node3D" node_paths=PackedStringArray("libro", "mano_izquierda") unique_id=1288509691]
 script = ExtResource("1_ycdy4")
+libro = NodePath("XROrigin3D/LeftHandMesh/libroMagico")
+mano_izquierda = NodePath("XROrigin3D/LeftHandMesh")
 
 [node name="StartVR" type="Node3D" parent="." unique_id=1237672918]
 script = ExtResource("2_5rtkn")
@@ -208,9 +210,10 @@ influence = 1.0
 script = ExtResource("8_gdsnk")
 grip_action = "pickup"
 
-[node name="SpellCaster" type="Node3D" parent="XROrigin3D" unique_id=1981080486 node_paths=PackedStringArray("wand_tip")]
+[node name="SpellCaster" type="Node3D" parent="XROrigin3D" node_paths=PackedStringArray("wand_drawing", "wand_tip") unique_id=1981080486]
 script = ExtResource("14_cegan")
-wand_tip = NodePath("../XRCamera3D")
+wand_drawing = NodePath("../RightHandController/WandPivot/WandMesh/WandTip")
+wand_tip = NodePath("../RightHandController/WandPivot/WandMesh/WandTip")
 fireball_scene = ExtResource("14_vivmo")
 water_jet_scene = ExtResource("15_2cqfq")
 bolt_scene = ExtResource("16_yaehf")

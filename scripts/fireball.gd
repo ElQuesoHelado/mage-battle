@@ -2,7 +2,8 @@ extends RigidBody3D
 class_name Fireball
 
 @export var speed: float = 12.0
-@export var damage: float = 25.0
+## Daño en puntos de vida. Ver wizard.gd:max_health para el balance.
+@export var damage: int = 1
 @export var lifetime_seconds: float = 5.0
 @export var radius: float = 0.20
 
@@ -298,7 +299,8 @@ func _on_body_entered(body: Node) -> void:
 		return
 	if body.has_method("take_damage"):
 		body.take_damage(damage)
-		queue_free()
+	# La explosión es la que programa el borrado: si además se hiciera
+	# queue_free() aquí, el proyectil desaparecería sin efecto de impacto.
 	_explode()
 
 

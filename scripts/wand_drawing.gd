@@ -21,7 +21,7 @@ const ShapeRecognizer = preload("res://scripts/shape_recognizer.gd")
 ## sale perpendicular al plano del dibujo (como un portal).
 @export var use_finger_direction_for_cast: bool = false
 
-@export var debug_log_trigger_state: bool = true
+@export var debug_log_trigger_state: bool = false
 
 @export var trail_width: float = 0.03  # 2 cm. Súbelo/bájalo al gusto
 
@@ -53,12 +53,18 @@ func _ready() -> void:
 		push_warning("WandDrawing: no se encontró XRHandTracker '%s'" % hand_tracker_name)
 
 	if draw_trail:
+		# El rastro es top_level, así que se cuelga de la escena para que
+		# no dependa de la jerarquía de la varita.
+		var host := get_tree().current_scene
+		if host == null:
+			push_warning("WandDrawing: no hay escena actual, el rastro no se creará")
+			return
 		_immediate_mesh = ImmediateMesh.new()
 		_trail_mesh = MeshInstance3D.new()
 		_trail_mesh.mesh = _immediate_mesh
 		_trail_mesh.material_override = trail_material if trail_material else _default_trail_material()
 		_trail_mesh.top_level = true
-		get_tree().current_scene.add_child.call_deferred(_trail_mesh)
+		host.add_child.call_deferred(_trail_mesh)
 
 
 func _default_trail_material() -> StandardMaterial3D:
@@ -148,17 +154,17 @@ func _sync_transform_to_hand() -> void:
 
 func _process(delta: float) -> void:
 	if not _hand_tracker or not _hand_tracker.has_tracking_data:
-		#print("No hand tracker")
 		return
 
 	_sync_transform_to_hand()
 
 	var closure := get_fist_closure()
-	
-	
+
+	# Histéresis: se empieza a dibujar con un puño más cerrado del que
+	# hace falta para soltar. Sin esto el trazo parpadea al borde del
+	# umbral.
 	var pressed: bool
 	if _is_drawing:
-		print(closure)
 		pressed = closure >= fist_off_threshold
 	else:
 		pressed = closure >= fist_on_threshold
@@ -167,11 +173,8 @@ func _process(delta: float) -> void:
 		_debug_timer += delta
 		if _debug_timer >= 1.0:
 			_debug_timer = 0.0
-			#print("[WandDrawing][DEBUG] closure=", closure,
-				#" pressed=", pressed,
-				#" is_drawing=", _is_drawing,
-				#" puntos=", _points.size(),
-				#" tip_pos=", global_position)
+			print("[WandDrawing] closure=%.2f pressed=%s puntos=%d"
+				% [closure, pressed, _points.size()])
 
 	if pressed and not _is_drawing:
 		_start_drawing()
@@ -186,7 +189,6 @@ func _start_drawing() -> void:
 	_points.clear()
 	_plane_normal = get_aim_direction()
 	_add_point(global_position)
-	print("[WandDrawing] INICIO trazo")
 	drawing_started.emit()
 
 
@@ -261,16 +263,13 @@ func _finish_drawing() -> void:
 		last_cast_direction = n
 
 	var path_length := _compute_path_length(_points)
-	print("[WandDrawing] FIN trazo: puntos=", _points.size(), " longitud=", path_length)
 
 	if _points.size() < min_points_for_shape or path_length < min_path_length:
-		print("[WandDrawing] trazo DESCARTADO")
 		_clear_trail()
 		drawing_cancelled.emit()
 		return
 
 	var shape: String = ShapeRecognizer.recognize(_points, _plane_normal)
-	print("[WandDrawing] figura reconocida: ", shape, " (", _points.size(), " puntos)")
 
 	shape_recognized.emit(shape, _points.duplicate())
 	_clear_trail()

@@ -14,6 +14,10 @@ extends RefCounted
 const N := 32
 const MATCH_THRESHOLD := 0.20
 
+## Poner a true para volcar los scores por figura. En un visor esto
+## genera decenas de líneas por segundo, así que va apagado.
+const DEBUG := false
+
 
 static func recognize(points_3d: Array[Vector3], plane_normal: Vector3) -> String:
 	if points_3d.size() < 6:
@@ -31,18 +35,21 @@ static func recognize(points_3d: Array[Vector3], plane_normal: Vector3) -> Strin
 	var best_name := "unknown"
 	var best_score := INF
 
-	print("[ShapeRecognizer] --- scores ---")
+	if DEBUG:
+		print("[ShapeRecognizer] --- scores ---")
 	for shape_name in templates.keys():
 		var tmpl: PackedVector2Array = _normalize(_resample(templates[shape_name], N))
 		var score := _best_match_distance(pts, tmpl)
-		print("[ShapeRecognizer]   %-9s => %.3f" % [shape_name, score])
+		if DEBUG:
+			print("[ShapeRecognizer]   %-9s => %.3f" % [shape_name, score])
 		if score < best_score:
 			best_score = score
 			best_name = shape_name
 
 	var result := best_name if best_score < MATCH_THRESHOLD else "unknown"
-	print("[ShapeRecognizer] elegido=%s (%.3f, umbral=%.3f)"
-		% [result, best_score, MATCH_THRESHOLD])
+	if DEBUG:
+		print("[ShapeRecognizer] elegido=%s (%.3f, umbral=%.3f)"
+			% [result, best_score, MATCH_THRESHOLD])
 	return result
 
 

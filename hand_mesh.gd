@@ -14,11 +14,18 @@ signal pinch_exited
 @export var distancia_soltar: float = 0.08   # ← debes separar más para soltar
 @export var hold_time: float = 0.25          # exige mantener el gesto más tiempo
 
-@export var debug_prints: bool = true
+## Volcado por consola. Apagado por defecto: a 90 Hz generaba cientos
+## de líneas por segundo en el visor.
+@export var debug_prints: bool = false
 
 var _pinzando: bool = false
 var _t_pinza: float = 0.0
 var _t_suelta: float = 0.0
+var _debug_t: float = 0.0
+
+
+func _label() -> String:
+	return "L" if hand == 0 else "R"
 
 
 func _process(delta: float) -> void:
@@ -29,7 +36,7 @@ func _process(delta: float) -> void:
 
 	if hand_tracker == null or not hand_tracker.has_tracking_data:
 		if debug_prints:
-			print("[MANO L] sin hand tracking")
+			_log_throttled("sin hand tracking")
 		return
 
 	if tracker != new_tracker:
@@ -46,7 +53,7 @@ func _process(delta: float) -> void:
 	var distancia := thumb_tip.origin.distance_to(index_tip.origin)
 
 	if debug_prints:
-		print("[MANO L] dist=%.3f  pinzando=%s" % [distancia, _pinzando])
+		_log_throttled("dist=%.3f pinzando=%s" % [distancia, _pinzando])
 
 	# --- Lógica con histéresis + hold time ---
 	if not _pinzando:
@@ -57,7 +64,8 @@ func _process(delta: float) -> void:
 				_t_pinza = 0.0
 				_t_suelta = 0.0
 				pinch_entered.emit()
-				print("[MANO L] ➜ PINZA (dist=%.3f)" % distancia)
+				if debug_prints:
+					print("[MANO %s] PINZA (dist=%.3f)" % [_label(), distancia])
 		else:
 			_t_pinza = 0.0
 	else:
@@ -68,6 +76,17 @@ func _process(delta: float) -> void:
 				_t_suelta = 0.0
 				_t_pinza = 0.0
 				pinch_exited.emit()
-				print("[MANO L] ➜ SUELTA (dist=%.3f)" % distancia)
+				if debug_prints:
+					print("[MANO %s] SUELTA (dist=%.3f)" % [_label(), distancia])
 		else:
 			_t_suelta = 0.0
+
+
+## Limita el volcado a una línea por segundo y medio para no ahogar
+## el log del dispositivo.
+func _log_throttled(msg: String) -> void:
+	_debug_t += get_process_delta_time()
+	if _debug_t < 1.5:
+		return
+	_debug_t = 0.0
+	print("[MANO %s] %s" % [_label(), msg])

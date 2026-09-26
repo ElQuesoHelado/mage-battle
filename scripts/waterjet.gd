@@ -3,7 +3,8 @@ class_name WaterJet
 
 
 @export var speed: float = 16.0
-@export var damage: float = 15.0
+## Daño en puntos de vida. Ver wizard.gd:max_health para el balance.
+@export var damage: int = 1
 @export var lifetime_seconds: float = 2.5
 @export var radius: float = 0.15
 

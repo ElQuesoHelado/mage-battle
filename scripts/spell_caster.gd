@@ -16,11 +16,18 @@ class_name SpellSystem
 
 @export_group("Mono")
 @export var mono_mesh: Mesh = preload("res://assets/Orangutan.obj")
+## Techo de monos vivos: evita que alguien invoque 500 y revente la
+## memoria del Quest.
+@export var mono_max_count: int = 12
 
 @export_group("HUD VR")
 @export var hud_distance: float = 1.2
 @export var hud_font_size: int = 96
 @export var debug_font_size: int = 32
+## Volcado de estado interno (shape/word/hits) bajo el texto principal.
+@export var show_debug_hud: bool = false
+## Avisos breves al jugador ("decí la palabra", "esa figura es de...").
+@export var feedback_seconds: float = 3.0
 
 const SPELL_TABLE := {
 	"fuego": "circle",
@@ -42,13 +49,24 @@ var _cooldown_timer: float = 0.0
 var _last_word: String = ""
 var _signal_hits: int = 0
 
-var _cast_feedback: String = ""
-var _cast_feedback_timestamp: float = -INF
+var _feedback: String = ""
+var _feedback_timestamp: float = -INF
 
 var _voice_source: Node
 var _hud: Label3D
 var _debug_hud: Label3D
 var _hud_anchor: Node3D
+
+# Cachés: reasignar el texto de un Label3D regenera su malla, así que
+# solo se toca cuando el string cambia de verdad.
+var _hud_cache: String = ""
+var _debug_cache: String = ""
+var _debug_timer: float = 0.0
+
+# El "mono" reutiliza la misma malla y el mismo shape: crear un
+# trimesh nuevo por cada invocación era el grueso del coste.
+var _mono_shape: ConcavePolygonShape3D
+var _mono_bodies: Array[Node] = []
 
 
 func _ready() -> void:
@@ -57,26 +75,19 @@ func _ready() -> void:
 	# Si no está asignado en el inspector, lo buscamos en la escena.
 	if not wand_drawing:
 		wand_drawing = _find_wand_drawing()
-		if wand_drawing:
-			print("[SpellSystem] WandDrawing encontrado por búsqueda: ", wand_drawing.name)
 
 	if wand_drawing:
-		var ok := wand_drawing.shape_recognized.connect(_on_shape_recognized)
-		if ok == OK:
-			print("[SpellSystem] conexión OK con shape_recognized")
-		else:
-			push_error("[SpellSystem] fallo al conectar: código %d" % ok)
+		var err := wand_drawing.shape_recognized.connect(_on_shape_recognized)
+		if err != OK:
+			push_error("[SpellSystem] no se pudo conectar shape_recognized (%d)" % err)
 	else:
 		push_error("[SpellSystem] NO encontré ningún WandDrawing en la escena")
 
 	_voice_source = get_tree().current_scene
 	if _voice_source and _voice_source.has_signal("word_recognized"):
 		_voice_source.word_recognized.connect(_on_word_recognized)
-		print("[SpellSystem] conexión OK con word_recognized")
 	else:
 		push_error("[SpellSystem] escena principal sin 'word_recognized'")
-
-	print("[SpellSystem] listo")
 
 
 func _find_wand_drawing() -> WandDrawing:
@@ -99,49 +110,50 @@ func _find_recursive(n: Node) -> Node:
 func _on_shape_recognized(shape_name: String, _points: Array) -> void:
 	_signal_hits += 1
 	var s := shape_name.to_lower()
-	print("[SpellSystem] FIGURA: '", s, "' (hit #", _signal_hits, ")")
 
 	if s == "" or s == "unknown":
+		_set_feedback("No reconocí esa figura")
+		return
+
+	# "star" y "heart" las reconoce el reconocedor pero no son hechizo.
+	if not SHAPE_LABEL.has(s):
+		_set_feedback("%s no es un hechizo" % s.to_upper())
 		return
 
 	_pending_shape = s
 	_shape_timestamp = Time.get_ticks_msec() / 1000.0
+	_set_feedback("Decí: %s" % SHAPE_LABEL[s])
 
 
 func _on_word_recognized(word: String) -> void:
 	var w := word.to_lower().strip_edges()
 	_last_word = w
-	print("[SpellSystem] VOZ: '", w, "'")
 
 	if w == "mono":
 		_spawn_mono()
 		return
 
 	if not SPELL_TABLE.has(w):
-		print("[SpellSystem] palabra no es hechizo")
 		return
 
 	if _pending_shape == "":
-		print("[SpellSystem] no hay figura armada")
+		_set_feedback("Primero dibujá una figura")
 		return
 
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - _shape_timestamp > shape_window_seconds:
-		print("[SpellSystem] figura expirada")
 		_clear_pending_shape()
+		_set_feedback("Se pasó el tiempo, dibujá de nuevo")
 		return
 
 	var expected: String = SPELL_TABLE[w]
 	if _pending_shape != expected:
-		print("[SpellSystem] figura incorrecta: '", _pending_shape,
-			"' vs esperada '", expected, "'")
+		_set_feedback("Esa figura no es de %s" % w.to_upper())
 		return
 
 	if _cooldown_timer > 0.0:
-		print("[SpellSystem] en cooldown")
 		return
 
-	print("[SpellSystem] *** HECHIZO: '", w, "' + '", _pending_shape, "' ***")
 	_cast_spell(w)
 	_clear_pending_shape()
 
@@ -154,40 +166,62 @@ func _process(delta: float) -> void:
 	if _cooldown_timer > 0.0:
 		_cooldown_timer -= delta
 
+	var now := Time.get_ticks_msec() / 1000.0
+	var lines: Array[String] = []
+
 	if _pending_shape != "":
-		var now := Time.get_ticks_msec() / 1000.0
 		var remaining := shape_window_seconds - (now - _shape_timestamp)
 		if remaining <= 0.0:
 			_clear_pending_shape()
 		else:
-			var label_text: String = SHAPE_LABEL.get(_pending_shape, _pending_shape.to_upper())
-			_hud.text = "%s\n%.1fs · di la palabra" % [label_text, remaining]
-	else:
-		_hud.text = ""
+			lines.append(SHAPE_LABEL.get(_pending_shape, _pending_shape.to_upper()))
+			lines.append("%.1fs · decí la palabra" % remaining)
 
-	_update_debug_hud()
+	if _feedback != "":
+		if now - _feedback_timestamp > feedback_seconds:
+			_feedback = ""
+		else:
+			lines.append(_feedback)
+
+	_set_hud("\n".join(lines))
+	_update_debug_hud(now)
 
 
-func _update_debug_hud() -> void:
+func _set_hud(text: String) -> void:
+	if text == _hud_cache:
+		return
+	_hud_cache = text
+	_hud.text = text
+
+
+func _update_debug_hud(now: float) -> void:
 	if not _debug_hud:
 		return
+	_debug_hud.visible = show_debug_hud
+	if not show_debug_hud:
+		return
+
+	# Volcado a ~4 Hz: es información de depuración, no HUD.
+	_debug_timer -= get_process_delta_time()
+	if _debug_timer > 0.0:
+		return
+	_debug_timer = 0.25
+
 	var lines: Array[String] = []
 	lines.append("shape: '%s'" % _pending_shape)
 	lines.append("word:  '%s'" % _last_word)
 	lines.append("hits:  %d" % _signal_hits)
 	if _pending_shape != "":
-		var now := Time.get_ticks_msec() / 1000.0
-		var rem := shape_window_seconds - (now - _shape_timestamp)
-		lines.append("timer: %.1fs" % rem)
+		lines.append("timer: %.1fs"
+			% (shape_window_seconds - (now - _shape_timestamp)))
 	if not wand_drawing:
 		lines.append("wand: NULL")
-	if _cast_feedback != "":
-		var elapsed := Time.get_ticks_msec() / 1000.0 - _cast_feedback_timestamp
-		if elapsed > 3.0:
-			_cast_feedback = ""
-		else:
-			lines.append("cast: %s" % _cast_feedback)
-	_debug_hud.text = "\n".join(lines)
+
+	var text := "\n".join(lines)
+	if text == _debug_cache:
+		return
+	_debug_cache = text
+	_debug_hud.text = text
 
 
 func _setup_hud() -> void:
@@ -219,46 +253,40 @@ func _setup_hud() -> void:
 	_debug_hud.pixel_size = 0.001
 	_debug_hud.position = Vector3(0, -0.15, -hud_distance)
 	_debug_hud.text = ""
+	# Apagado salvo que show_debug_hud se active a mano.
+	_debug_hud.visible = false
 	_hud_anchor.add_child(_debug_hud)
 
 
 func _clear_pending_shape() -> void:
 	_pending_shape = ""
 	_shape_timestamp = -INF
-	if _hud:
-		_hud.text = ""
 
 
 func _cast_spell(word: String) -> void:
 	match word:
 		"fuego":
-			if not fireball_scene:
-				_feedback("FALTA fireball_scene en el inspector")
-				return
-			_cast_projectile(fireball_scene, "fireball")
+			_cast_projectile(fireball_scene, "FUEGO")
 		"agua":
-			if not water_jet_scene:
-				_feedback("FALTA water_jet_scene en el inspector")
-				return
-			_cast_projectile(water_jet_scene, "water_jet")
+			_cast_projectile(water_jet_scene, "AGUA")
 		"rayo":
-			if not bolt_scene:
-				_feedback("FALTA bolt_scene en el inspector")
-				return
-			_cast_projectile(bolt_scene, "bolt")
+			_cast_projectile(bolt_scene, "RAYO")
 		"roca":
-			if not rock_scene:
-				_feedback("FALTA rock_scene en el inspector")
-				return
-			_cast_projectile(rock_scene, "roca")
-			
+			_cast_projectile(rock_scene, "ROCA")
+
+
 func _cast_projectile(scene: PackedScene, label: String) -> void:
 	if not wand_tip:
-		_feedback("FALTA wand_tip en el inspector")
+		_set_feedback("Falta wand_tip en el inspector")
+		return
+	if not scene:
+		_set_feedback("Falta la escena de %s" % label)
 		return
 
-	var projectile: Node3D = scene.instantiate()
-	get_tree().current_scene.add_child(projectile)
+	var projectile := scene.instantiate() as Node3D
+	if projectile == null or not projectile.has_method("launch"):
+		_set_feedback("La escena de %s no tiene launch()" % label)
+		return
 
 	var forward: Vector3
 	var origin: Vector3
@@ -269,49 +297,90 @@ func _cast_projectile(scene: PackedScene, label: String) -> void:
 		forward = -wand_tip.global_transform.basis.z
 		origin = wand_tip.global_position
 
+	get_tree().current_scene.add_child(projectile)
 	projectile.global_position = origin + forward * 0.1
-
-	if not projectile.has_method("launch"):
-		_feedback("La escena '%s' no tiene launch()" % label)
-		return
-
 	projectile.launch(forward)
-	_cooldown_timer = cooldown_seconds
-	_feedback("CAST: %s OK" % label)
 
+	_cooldown_timer = cooldown_seconds
+	_set_feedback("¡%s!" % label)
+
+
+# -----------------------------------------------------------------
+# Mono
+# -----------------------------------------------------------------
 
 func _spawn_mono() -> void:
 	var camera := get_viewport().get_camera_3d()
 	if not camera:
 		return
+
 	var from := camera.global_transform.origin
-	var forward := -camera.global_transform.basis.z
-	var to := from + forward * 100.0
-	var space_state := get_world_3d().direct_space_state
+	var to := from + (-camera.global_transform.basis.z) * 100.0
 	var query := PhysicsRayQueryParameters3D.create(from, to)
-	var result := space_state.intersect_ray(query)
+	var result := get_world_3d().direct_space_state.intersect_ray(query)
 	if result.is_empty():
+		_set_feedback("No veo dónde ponerlo")
 		return
-	_create_mono_at(result.position)
+
+	_create_mono_at(result.position, camera.global_transform.origin)
+	_set_feedback("¡Mono invocado!")
 
 
-func _create_mono_at(pos: Vector3) -> void:
+func _create_mono_at(pos: Vector3, look_from: Vector3) -> void:
+	if not mono_mesh:
+		return
+
+	# El shape se crea una sola vez y se comparte entre todos los monos.
+	if _mono_shape == null:
+		_mono_shape = mono_mesh.create_trimesh_shape()
+	_prune_monos()
+
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.mesh = mono_mesh
+	mesh_instance.material_override = _mono_material()
+
 	var body := StaticBody3D.new()
-	body.global_transform.origin = pos
-	var collision_shape := CollisionShape3D.new()
-	collision_shape.shape = mono_mesh.create_trimesh_shape()
 	body.add_child(mesh_instance)
+
+	var collision_shape := CollisionShape3D.new()
+	collision_shape.shape = _mono_shape
 	body.add_child(collision_shape)
+
 	get_tree().current_scene.add_child(body)
-	var camera := get_viewport().get_camera_3d()
-	if camera:
-		body.look_at(camera.global_transform.origin, Vector3.UP)
-	print("[SpellSystem] MONO en ", pos)
-	
-	
-func _feedback(msg: String) -> void:
-	_cast_feedback = msg
-	_cast_feedback_timestamp = Time.get_ticks_msec() / 1000.0
-	print("[SpellSystem] FEEDBACK: ", msg)
+	# Se posiciona ya dentro del árbol: si se fijara global_position
+	# antes, en un nodo sin padre se interpretaría como local.
+	body.global_position = pos
+	if pos.distance_to(look_from) > 0.01:
+		body.look_at(look_from, Vector3.UP)
+
+	_mono_bodies.append(body)
+
+
+func _mono_material() -> StandardMaterial3D:
+	# El .obj viene sin .mtl, así que la superficie sale sin material.
+	# Se asigna uno aquí para que no se vea negro puro.
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.42, 0.30, 0.20)
+	mat.roughness = 0.9
+	return mat
+
+
+func _prune_monos() -> void:
+	var dead: Array[Node] = []
+	for m in _mono_bodies:
+		if not is_instance_valid(m):
+			dead.append(m)
+	for m in dead:
+		_mono_bodies.erase(m)
+
+	while _mono_bodies.size() >= mono_max_count:
+		# pop_front() devuelve Variant en un Array tipado, así que el tipo
+		# se declara explícito (si no, el aviso de inferencia es error).
+		var oldest: Node = _mono_bodies.pop_front()
+		if is_instance_valid(oldest):
+			oldest.queue_free()
+
+
+func _set_feedback(msg: String) -> void:
+	_feedback = msg
+	_feedback_timestamp = Time.get_ticks_msec() / 1000.0

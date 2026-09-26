@@ -1,6 +1,0 @@
-[gd_scene format=3 uid="uid://cu178kamis5ac"]
-
-[ext_resource type="Script" uid="uid://b2uov582kwl" path="res://scripts/water_jet.gd" id="1_hsnwo"]
-
-[node name="WaterJet" type="Node3D" unique_id=868344755]
-script = ExtResource("1_hsnwo")

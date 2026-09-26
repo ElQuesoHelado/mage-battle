@@ -2,7 +2,9 @@ extends RigidBody3D
 class_name Rock
 
 @export var speed: float = 10.0
-@export var damage: float = 45.0
+## Daño en puntos de vida. La roca es el hechizo más lento pero el
+## único que reparte 2 puntos, así que mata en la mitad de golpes.
+@export var damage: int = 2
 @export var lifetime_seconds: float = 6.0
 @export var radius: float = 0.22
 

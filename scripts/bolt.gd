@@ -2,7 +2,8 @@ extends RigidBody3D
 class_name Bolt
 
 @export var speed: float = 28.0
-@export var damage: float = 20.0
+## Daño en puntos de vida. Ver wizard.gd:max_health para el balance.
+@export var damage: int = 1
 @export var lifetime_seconds: float = 1.5
 @export var radius: float = 0.10
 
