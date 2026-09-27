@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://pr0r7vgav3ps"
+path="res://.godot/imported/wall_window_closed_scaffold.obj-908e54c0e09e791716f5795dd5b354cc.mesh"
+
+[deps]
+
+files=["res://.godot/imported/wall_window_closed_scaffold.obj-908e54c0e09e791716f5795dd5b354cc.mesh"]
+
+source_file="res://assets/Models/KayKit_Dungeon_Pack_1.1_FREE/Assets/obj/wall_window_closed_scaffold.obj"
+dest_files=["res://.godot/imported/wall_window_closed_scaffold.obj-908e54c0e09e791716f5795dd5b354cc.mesh", "res://.godot/imported/wall_window_closed_scaffold.obj-908e54c0e09e791716f5795dd5b354cc.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
