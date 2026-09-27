@@ -35,7 +35,12 @@ const COLOR := {
 
 ## Texto corto que resume la regla, para el HUD.
 const RULE_TEXT := "FUEGO→AGUA · AGUA→RAYO · RAYO→TIERRA · TIERRA→FUEGO"
-const ENERGY_TEXT := "Dibuja círculos para encender el ALTAR MAYOR"
+const ENERGY_TEXT := "Dibuja un trazo largo para encender el ALTAR MAYOR"
+
+## Resultado de la última partida. Lo lee outro.gd al cambiar de escena.
+## Una static var evita tener que montar un autoload sólo para pasar un
+## booleano de una escena a la siguiente.
+static var last_result_victoria: bool = true
 
 
 static func label_of(element: String) -> String:
@@ -70,11 +75,37 @@ static func weakness_text(weak: String) -> String:
 
 @export_group("Altares")
 ## Altar Mayor: el único que habilita el lanzamiento. Su energía la
-## recarga el jugador dibujando círculos.
+## recarga el jugador dibujando un trazo largo con la varita.
 @export var major_altar: AltarMayor
 @export var cast_cost: float = 20.0
 ## En false se puede hechizar sin energía. Sólo para depurar.
 @export var require_energy: bool = true
+
+@export_group("Olas de magos")
+## Escena de mago. Antes había cuatro magos fijos en main.tscn; ahora
+## se instancia uno por elemento de cada ola, así que el orden de la
+## partida está en una tabla y no en la jerarquía de la escena.
+@export var wizard_scene: PackedScene
+## Cada entrada es una ola. Dentro, el elemento al que es vulnerable
+## cada mago.
+@export var waves: Array[PackedStringArray] = [
+	PackedStringArray(["agua", "fuego"]),
+	PackedStringArray(["tierra", "rayo"]),
+]
+## Dónde salen. Se van reusing en orden, así que con dos puntos y olas
+## de dos magos cada uno va a un sitio.
+@export var wizard_spawn_points: Array[Vector3] = [
+	Vector3(-1.6, 0.1, -4.4),
+	Vector3(1.6, 0.1, -4.4),
+]
+@export var wizard_max_health: int = 3
+## Proyectil que lanzan los magos al libro. Se pasa a cada mago recién
+## creado para que wizard.gd no lleve rutas escritas.
+@export var enemy_projectile: PackedScene
+## Segundos de respiro entre que cae la última ola y entra la siguiente.
+## Es lo que marca el ritmo de la partida: sin esto, matar dos magos
+## seguido y ver aparecer dos más al instante es un muro.
+@export var wave_break_seconds: float = 2.5
 
 @export_group("Jefe gigante")
 @export var giant_scene: PackedScene
@@ -85,6 +116,9 @@ static func weakness_text(weak: String) -> String:
 ## Distancia a la que aparece el jefe, por delante del jugador.
 @export var giant_spawn_distance: float = 4.5
 @export var giant_cleanup_delay: float = 2.0
+## El jefe dispara más despacio que los magos normales: es más grande
+## y su animación se lee peor de lejos.
+@export var giant_attack_interval: float = 9.0
 
 @export_group("Ajustes")
 @export var cooldown_seconds: float = 0.35
@@ -98,7 +132,14 @@ static func weakness_text(weak: String) -> String:
 
 @export_group("Mono")
 @export var mono_mesh: Mesh = preload("res://assets/Orangutan.obj")
-@export var mono_max_count: int = 12
+## Tope de monos vivos. Ahora cada uno se autodestruye, así que esto es
+## sólo una red de seguridad para invocar veinte veces seguidas.
+@export var mono_max_count: int = 6
+## Daño del mono. Es poco contra magos normales, pero cuesta la misma
+## energía que un hechizo, así que no sirve para ganar la partida.
+@export var mono_damage: int = 1
+## Distancia a la que aparece, por delante del jugador.
+@export var mono_spawn_distance: float = 1.6
 
 @export_group("HUD VR")
 @export var hud_distance: float = 1.2
@@ -114,6 +155,11 @@ var _altars: Array[Node] = []
 var _cooldown: float = 0.0
 var _giant_spawned: bool = false
 var _finished: bool = false
+## Índice de la ola que se está jugando. -1 = aún no ha empezado ninguna.
+var _wave_index: int = -1
+## El libro mágico, o null si la escena no lo trae. Es lo que hay que
+## proteger: si cae, derrota.
+var _book: LibroMagico
 
 var _feedback: String = ""
 var _feedback_timestamp: float = -INF
@@ -128,9 +174,6 @@ var _hud_dirty: bool = true
 ## Último porcentaje pintado en la barra, para no reescribirla cada
 ## frame mientras la energía se drena.
 var _hud_pct: int = -1
-
-var _mono_shape: ConcavePolygonShape3D
-var _mono_bodies: Array[Node] = []
 
 
 # -----------------------------------------------------------------
@@ -150,6 +193,7 @@ func _ready() -> void:
 	# no haber resuelto. Un frame más tarde todo está en su sitio y el
 	# orden en el archivo deja de importar.
 	_connect_altar.call_deferred()
+	_begin_battle.call_deferred()
 
 
 func _connect_altar() -> void:
@@ -165,13 +209,26 @@ func _connect_altar() -> void:
 	if not major_altar.energy_gained.is_connected(_on_energy_gained):
 		major_altar.energy_gained.connect(_on_energy_gained)
 
-	# El círculo se dibuja con la varita, que cuelga del mando derecho.
+	# La energía la recarga el trazo que se hace con la varita, que cuelga
+	# del mando derecho.
 	var wand := get_tree().get_first_node_in_group("wand_drawing")
 	if wand != null and wand.has_signal("stroke_finished"):
 		if not wand.stroke_finished.is_connected(_on_stroke_finished):
 			wand.stroke_finished.connect(_on_stroke_finished)
 	else:
 		push_warning("[SpellSystem] no se encontró WandDrawing: el altar no se podrá recargar")
+
+
+## Conexión con el libro y arranque de la primera ola.Va diferido por lo
+## mismo que el altar: los grupos sólo existen un frame después.
+func _begin_battle() -> void:
+	_book = get_tree().get_first_node_in_group("libro_magico") as LibroMagico
+	if _book == null:
+		push_warning("[SpellSystem] no se encontró el libro mágico: no habrá condición de derrota")
+	else:
+		_book.destruido.connect(_on_book_destroyed)
+
+	_spawn_wave(_wave_index + 1)
 
 
 func _connect_voice() -> void:
@@ -222,6 +279,11 @@ func notify_weakness_changed(_weak_element: String) -> void:
 	_hud_dirty = true
 
 
+## Lo llama el libro al recibir un golpe, para que el HUD repinte la vida.
+func notify_book_damaged(_health: int) -> void:
+	_hud_dirty = true
+
+
 # -----------------------------------------------------------------
 # Trazo → energía
 # -----------------------------------------------------------------
@@ -244,6 +306,11 @@ func _on_word_recognized(word: String) -> void:
 	var w := word.to_lower().strip_edges()
 
 	if w == "mono":
+		# El mono también cuesta energía. Antes salía por aquí antes del
+		# control, y como hace daño de verdad se podía spamear gratis
+		# hasta matar una ola entera sin decir un hechizo.
+		if _finished or not _puede_pagar() or _cooldown > 0.0:
+			return
 		_spawn_mono()
 		return
 
@@ -253,16 +320,8 @@ func _on_word_recognized(word: String) -> void:
 	if _finished:
 		return
 
-	if require_energy:
-		if major_altar == null or not is_instance_valid(major_altar):
-			_set_feedback("No hay Altar Mayor")
-			return
-		if not major_altar.is_online():
-			_set_feedback("Sin energía: dibuja un círculo en el aire")
-			return
-		if major_altar.energia < cast_cost:
-			_set_feedback("Energía insuficiente (%d)" % int(major_altar.energia))
-			return
+	if not _puede_pagar():
+		return
 
 	if _cooldown > 0.0:
 		return
@@ -273,6 +332,24 @@ func _on_word_recognized(word: String) -> void:
 		return
 
 	_cast(w)
+
+
+## El control de energía, en un sitio, para que el mono y los hechizos
+## cuesten exactamente lo mismo y no se separen a partir por caminos
+## distintos. Pone el aviso en el HUD y devuelve si se puede pagar.
+func _puede_pagar() -> bool:
+	if not require_energy:
+		return true
+	if major_altar == null or not is_instance_valid(major_altar):
+		_set_feedback("No hay Altar Mayor")
+		return false
+	if not major_altar.is_online():
+		_set_feedback("Sin energía: dibuja un trazo largo en el aire")
+		return false
+	if major_altar.energia < cast_cost:
+		_set_feedback("Energía insuficiente (%d)" % int(major_altar.energia))
+		return false
+	return true
 
 
 func _cast(element: String) -> void:
@@ -327,15 +404,59 @@ func _scene_for(element: String) -> PackedScene:
 
 ## Lo llama wizard.gd cuando un mago se muere. El mago ya se ha
 ## retirado del grupo "mages" en ese punto, así que un grupo vacío
-## significa "no queda ningún elemental normal".
+## significa "se ha limpiado la ola".
+##
+## Dos magos que mueren en el mismo frame no se cuelan: el primero ve
+## al otro todavía en el grupo y no avanza.
 func register_mage_kill() -> void:
 	if _finished:
 		return
 	if _giant_spawned:
-		_finish()
+		_finish(true)
 		return
-	if get_tree().get_nodes_in_group("mages").is_empty():
+	if not get_tree().get_nodes_in_group("mages").is_empty():
+		return
+
+	var next := _wave_index + 1
+	if next < waves.size():
+		_wave_index = next
+		# Un respiro entre olas. Sin él, matar dos magos seguidos y ver
+		# aparecer dos más al instante convierte la partida en un muro.
+		get_tree().create_timer(wave_break_seconds).timeout.connect(
+			_spawn_wave.bind(next), CONNECT_ONE_SHOT
+		)
+		_set_feedback("Oleada %d de %d" % [next + 1, waves.size()])
+	else:
 		_spawn_giant()
+
+
+## Instancia los magos de una ola. Las propiedades se fijan ANTES de
+## añadir al árbol: wizard.gd decide su debilidad y se pinta con ella en
+## su _ready(), así que si se llega tarde el mago sale con el material
+## blanco original.
+func _spawn_wave(index: int) -> void:
+	if _finished or wizard_scene == null:
+		return
+	if index < 0 or index >= waves.size():
+		_spawn_giant()
+		return
+
+	var elements: PackedStringArray = waves[index]
+	for i in elements.size():
+		var w: Node3D = wizard_scene.instantiate()
+		w.weak_element = elements[i]
+		w.max_health = wizard_max_health
+		w.attack_projectile = enemy_projectile
+
+		get_tree().current_scene.add_child(w)
+		var point: Vector3 = wizard_spawn_points[i % wizard_spawn_points.size()]
+		w.global_position = point
+		# Y mira al jugador desde el sitio donde aparece, no antes.
+		var cam := get_viewport().get_camera_3d()
+		if cam != null and w.global_position.distance_to(cam.global_position) > 0.01:
+			w.look_at(cam.global_position, Vector3.UP)
+
+	_wave_index = index
 
 
 func _spawn_giant() -> void:
@@ -343,7 +464,7 @@ func _spawn_giant() -> void:
 		return
 	if giant_scene == null:
 		push_error("[SpellSystem] falta giant_scene; no se puede invocar al jefe")
-		_finish()
+		_finish(true)
 		return
 
 	var cam := get_viewport().get_camera_3d()
@@ -374,6 +495,10 @@ func _spawn_giant() -> void:
 	giant.shrinks_on_damage = true
 	giant.base_scale = Vector3.ONE * giant_scale
 	giant.scale = giant.base_scale
+	# El jefe también dispara al libro, pero más despacio: es enorme y
+	# su animación se lee peor de lejos que la de un mago normal.
+	giant.attack_projectile = enemy_projectile
+	giant.attack_interval = giant_attack_interval
 
 	get_tree().current_scene.add_child(giant)
 	giant.global_position = pos
@@ -385,8 +510,17 @@ func _spawn_giant() -> void:
 	_set_feedback("¡El GRAN MAGO se alza! Su color dice qué le pega.")
 
 
-func _finish() -> void:
+## El libro se quedó sin vida: derrota.
+func _on_book_destroyed() -> void:
+	_finish(false)
+
+
+func _finish(victoria: bool) -> void:
+	if _finished:
+		return
 	_finished = true
+	last_result_victoria = victoria
+	_set_feedback("¡Victoria!" if victoria else "El libro se ha deshecho")
 	# call_deferred: register_mage_kill() llega desde un body_entered, o
 	# sea desde el paso de física. Cambiar de escena ahí empieza a
 	# liberar los cuerpos y los que quedan reciben take_damage() sin
@@ -400,6 +534,11 @@ func _finish() -> void:
 
 func _build_hud_text() -> String:
 	var lines: Array[String] = []
+
+	# El libro puede estar a la izquierda y fuera de la vista, así que su
+	# vida también va en el HUD, no sólo en la etiqueta que lleva encima.
+	if _book != null and is_instance_valid(_book) and not _finished:
+		lines.append(_book_line())
 
 	# El jefe puede estar detrás del jugador, así que su debilidad
 	# se repite en el HUD además de estar en su etiqueta.
@@ -416,6 +555,18 @@ func _build_hud_text() -> String:
 		lines.append(_feedback)
 
 	return "\n".join(lines)
+
+
+## Vida del libro con 8 bloques, igual que la energía. Se pone en rojo
+## cuando entra en la zona roja, para que se note de un vistazo.
+func _book_line() -> String:
+	var cur: int = _book.health
+	var total: int = maxi(1, _book.max_health)
+	var lit: int = int(round(float(cur) / float(total) * 8.0))
+	var bar: String = "▮".repeat(lit) + "▯".repeat(8 - lit)
+	if _book.health <= 0:
+		return "LIBRO MAGICO DESTRUIDO"
+	return "LIBRO MAGICO  %s  %d/%d" % [bar, cur, total]
 
 
 func _giant_weakness() -> String:
@@ -476,73 +627,44 @@ func _setup_hud() -> void:
 
 
 # -----------------------------------------------------------------
-# Mono (detalle)
+# Mono
 # -----------------------------------------------------------------
 
+## Aparece por delante del jugador, a ras de suelo, y a partir de ahí
+## se encarga solo: Mono busca al mago más cercano, corre hacia él y
+## explota. Aquí sólo se coloca y se cobra.
 func _spawn_mono() -> void:
+	if mono_mesh == null:
+		return
+
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
 
-	var from := cam.global_position
-	var to: Vector3 = from + (-cam.global_transform.basis.z) * 100.0
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	var result := get_world_3d().direct_space_state.intersect_ray(query)
-	if result.is_empty():
-		_set_feedback("No veo dónde ponerlo")
-		return
-
-	_create_mono_at(result.position, from)
-	_set_feedback("¡Mono invocado!")
-
-
-func _create_mono_at(pos: Vector3, look_from: Vector3) -> void:
-	if mono_mesh == null:
-		return
-
-	# El shape se crea una sola vez y se comparte entre todos los monos.
-	if _mono_shape == null:
-		_mono_shape = mono_mesh.create_trimesh_shape()
-	_prune_monos()
-
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.mesh = mono_mesh
-	mesh_instance.material_override = _mono_material()
-
-	var body := StaticBody3D.new()
-	body.add_child(mesh_instance)
-
-	var collision_shape := CollisionShape3D.new()
-	collision_shape.shape = _mono_shape
-	body.add_child(collision_shape)
-
-	get_tree().current_scene.add_child(body)
-	# Se posiciona ya dentro del árbol: si se fijara global_position
-	# antes, en un nodo sin padre se interpretaría como local.
-	body.global_position = pos
-	if pos.distance_to(look_from) > 0.01:
-		body.look_at(look_from, Vector3.UP)
-
-	_mono_bodies.append(body)
-
-
-func _mono_material() -> StandardMaterial3D:
-	# El .obj viene sin .mtl, así que la superficie sale sin material.
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.42, 0.30, 0.20)
-	mat.roughness = 0.9
-	return mat
-
-
-func _prune_monos() -> void:
-	var dead: Array[Node] = []
-	for m in _mono_bodies:
-		if not is_instance_valid(m):
-			dead.append(m)
-	for m in dead:
-		_mono_bodies.erase(m)
-
-	while _mono_bodies.size() >= mono_max_count:
-		var oldest: Node = _mono_bodies.pop_front()
+	# Si ya hay demasiados, se va el más viejo. Ahora cada mono se
+	# autodestruye al detonar, así que esto es sólo una red de seguridad.
+	var vivos: Array[Node] = get_tree().get_nodes_in_group("monos")
+	while vivos.size() >= mono_max_count:
+		var oldest: Node = vivos.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
+
+	var forward: Vector3 = -cam.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length() < 0.01:
+		forward = Vector3.FORWARD
+
+	var mono := Mono.new()
+	mono.mesh = mono_mesh
+	mono.damage = mono_damage
+
+	get_tree().current_scene.add_child(mono)
+	mono.global_position = cam.global_position + forward.normalized() * mono_spawn_distance
+	mono.global_position.y = 0.0
+
+	# Se cobra lo mismo que un hechizo: si no, "mono" sería un atajo
+	# gratis para matar la partida sin decir un solo elemento.
+	if major_altar != null and is_instance_valid(major_altar):
+		major_altar.spend(cast_cost)
+	_cooldown = cooldown_seconds
+	_set_feedback("¡Mono invocado!")

@@ -47,6 +47,33 @@ signal damage_rejected(weak_element: String)
 ## va de la escena, exista o no la animación "death".
 @export var death_cleanup_delay: float = 1.0
 
+@export_group("Ataque")
+## Si está a false el mago no dispara a nadie. El jefe sí dispara, pero
+## más despacio: lo pone SpellSystem al invocarlo.
+@export var can_attack: bool = true
+## Segundos entre disparos. El primero no espera esto entero: cada mago
+## arranca con un desfase aleatorio para que no disparen a la vez.
+@export var attack_interval: float = 6.0
+## Rango del desfase inicial. Si es 0, todos disparan a la vez.
+@export_range(0.0, 8.0) var attack_jitter: float = 3.5
+## Distancia máxima a la que llega a disparar.
+@export var attack_range: float = 16.0
+## El proyectil sale a mitad de animación, no al empezarla, para que se
+## vea el gesto antes que el disparo.
+@export var shot_delay: float = 0.6
+## Duración de la animación "Spell" en wizard.tscn (2,73 s). Se usa para
+## volver a idle: la máquina de estados no tiene transición de vuelta, y
+## sin esto el mago se queda congelado en el último fotograma.
+@export var spell_length: float = 2.7
+## Proyectil que lanza. Lo pone SpellSystem, igual que la escena del
+## jefe, para no tener la ruta escrita en la escena.
+@export var attack_projectile: PackedScene
+## Grupo al que dispara. El libro mágico, que es lo que hay que proteger.
+@export var attack_target_group: String = "libro_magico"
+## Altura desde la que sale el disparo, para que salga de las manos y no
+## de los pies.
+@export var shot_height: float = 1.45
+
 @onready var animation_tree: AnimationTree = $AnimationTree
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var playback: AnimationNodeStateMachinePlayback = animation_tree["parameters/playback"]
@@ -61,6 +88,15 @@ var _weakness_index: int = 0
 ## el bucle de física.
 var _target_yaw: float = 0.0
 var _face_timer: Timer
+## Temporizador de ataque. Es one_shot: al dispararse, _begin_attack()
+## encadena los dos temporizadores del disparo y vuelve a armar éste.
+var _attack_timer: Timer
+## El ataque en curso. Evita que dos disparos se solapen y de paso
+## permite cancelarlos al morir.
+var _casting: bool = false
+## face_player se desactiva mientras se ataca, para poder apuntar al
+## libro. Aquí se guarda para devolverlo.
+var _face_player_saved: bool = true
 
 
 func _ready() -> void:
@@ -68,6 +104,10 @@ func _ready() -> void:
 	animation_tree.active = true
 	playback.start("idle")
 	add_to_group("mages")
+	# Grupo de "dañable por el jugador". Los hechizos del jugador sólo
+	# golpean a este grupo, y así no le hacen daño a su propio libro ni a
+	# cualquier otra cosa que tenga un take_damage por ahí.
+	add_to_group("enemigo")
 	scale = base_scale
 
 	# El jefe decide su debilidad ANTES de pintarse. Si _tint() corriera
@@ -88,6 +128,112 @@ func _ready() -> void:
 		_face_timer.autostart = true
 		_face_timer.timeout.connect(_refresh_face_target)
 		add_child(_face_timer)
+
+	if can_attack and attack_interval > 0.0:
+		_attack_timer = Timer.new()
+		_attack_timer.one_shot = true
+		_attack_timer.timeout.connect(_on_attack_timer)
+		add_child(_attack_timer)
+		# Cada mago con su propio ritmo. Si arrancaran todos a la vez
+		# el libro caería en un segundo y medio y no parecería un juego
+		# sino una cuenta atrás.
+		_attack_timer.start(_first_attack_delay())
+
+
+## Cuánto espera el primer disparo. Un valor fijo por mago, para que no
+## cambie cada vez que se rearma el temporizador.
+func _first_attack_delay() -> float:
+	if attack_jitter <= 0.0:
+		return attack_interval
+	return attack_interval - randf_range(0.0, minf(attack_jitter, attack_interval))
+
+
+# -----------------------------------------------------------------
+# Ataque
+# -----------------------------------------------------------------
+
+func _on_attack_timer() -> void:
+	if is_dead or is_queued_for_deletion() or _casting:
+		return
+
+	var target := get_tree().get_first_node_in_group(attack_target_group)
+	if target == null or not is_instance_valid(target):
+		# Sin libro no hay a quién dispararle. Se rearma igualmente, por
+		# si vuelve a aparecer.
+		_attack_timer.start(attack_interval)
+		return
+
+	var from := global_position + Vector3.UP * shot_height
+	if from.distance_to((target as Node3D).global_position) > attack_range:
+		_attack_timer.start(attack_interval)
+		return
+
+	_begin_attack(target as Node3D)
+
+
+## Encadena los tres tiempos del hechizo del mago: la animación, el
+## disparo a mitad de ella y la vuelta a idle al acabarla.
+func _begin_attack(target: Node3D) -> void:
+	if attack_projectile == null:
+		# Sin escena de proyectil no hay ataque, pero tampoco un error por
+		# frame: se rearmal el temporizador y ya está.
+		_attack_timer.start(attack_interval)
+		return
+
+	_casting = true
+	play_spell()
+
+	# Durante el gesto no puede seguir mirando al jugador, o el disparo
+	# saldría de lado mientras él se vuelve hacia el libro.
+	_face_player_saved = face_player
+	face_player = false
+	if global_position.distance_to(target.global_position) > 0.01:
+		look_at(target.global_position, Vector3.UP)
+		_target_yaw = rotation.y
+
+	# connect() en vez de await: los mismos motivos que en _die(). Una
+	# corrutina que reanuda sobre un nodo ya liberado es un error de
+	# verdad, y aquí el mago se puede morir entre el play y el disparo.
+	get_tree().create_timer(shot_delay).timeout.connect(
+		_fire_shot.bind(target), CONNECT_ONE_SHOT
+	)
+	get_tree().create_timer(spell_length).timeout.connect(
+		_return_to_idle, CONNECT_ONE_SHOT
+	)
+
+
+func _fire_shot(target: Node3D) -> void:
+	if is_dead or is_queued_for_deletion() or not is_inside_tree():
+		return
+	if target == null or not is_instance_valid(target):
+		return
+
+	var shot := attack_projectile.instantiate() as Node3D
+	if shot == null:
+		return
+
+	# Las propiedades antes de añadirlo, por el mismo motivo que el jefe:
+	# el _ready() del proyectil ya busca su objetivo.
+	get_tree().current_scene.add_child(shot)
+	if shot.has_method("launch"):
+		shot.launch(global_position + Vector3.UP * shot_height, target)
+	else:
+		shot.global_position = global_position + Vector3.UP * shot_height
+
+
+## Vuelve a idle. A mano porque la máquina de estados de wizard.tscn no
+## tiene transiciones: sin auto_advance ni una Spell→idle, la animación
+## termina y el modelo se queda congelado en el último fotograma para
+## siempre.
+func _return_to_idle() -> void:
+	if is_dead or is_queued_for_deletion():
+		return
+	_casting = false
+	play_idle()
+	face_player = _face_player_saved
+	_target_yaw = _yaw_to_player()
+	if _attack_timer != null:
+		_attack_timer.start(attack_interval)
 
 
 ## Ángulo Y con el que el nodo debe quedar mirando al jugador.

@@ -18,6 +18,13 @@ var _anchor: Node3D
 
 
 func _ready() -> void:
+	# SpellSystem deja el resultado en una static var al cambiar de
+	# escena. No hace falta un autoload para pasar un booleano: el valor
+	# por defecto es victoria, y lo que cuenta es la última partida.
+	if not SpellSystem.last_result_victoria:
+		titulo = "¡DERROTA!"
+		subtitulo = "El libro mágico se ha deshecho"
+
 	_anchor = Node3D.new()
 	_anchor.name = "OutroAnchor"
 	# top_level para que el HUD no herede la escala/rotación del origen.
@@ -28,7 +35,12 @@ func _ready() -> void:
 	if cam:
 		_anchor.global_transform = cam.global_transform
 
-	_anchor.add_child(_make_label(titulo, title_font_size, Color(1.0, 0.85, 0.3), 0.35))
+	# En derrota el título va en rojo: es la única diferencia visual
+	# entre las dos pantallas, y tiene que leerse de un vistazo.
+	var color := Color(1.0, 0.85, 0.3) if SpellSystem.last_result_victoria \
+		else Color(1.0, 0.3, 0.25)
+
+	_anchor.add_child(_make_label(titulo, title_font_size, color, 0.35))
 	_anchor.add_child(_make_label(subtitulo, subtitle_font_size, Color(1, 1, 1), -0.05))
 
 	if restart_seconds > 0.0:

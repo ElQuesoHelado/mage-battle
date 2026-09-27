@@ -21,8 +21,9 @@
 [ext_resource type="PackedScene" uid="uid://cgb3i6y4fhgiw" path="res://scenes/bolt.tscn" id="16_yaehf"]
 [ext_resource type="PackedScene" uid="uid://dhgfshqoxxx7l" path="res://scenes/rock.tscn" id="17_074og"]
 [ext_resource type="PackedScene" uid="uid://bo7ccybskc15a" path="res://scenes/wizard.tscn" id="18_cegan"]
-[ext_resource type="PackedScene" uid="uid://bqx1altarm0001" path="res://scenes/altar_mayor.tscn" id="21_mayorsc"]
-[ext_resource type="Script" path="res://scripts/sfx.gd" id="22_sfx"]
+[ext_resource type="PackedScene" uid="uid://ppxw3cibem53" path="res://scenes/altar_mayor.tscn" id="21_mayorsc"]
+[ext_resource type="Script" uid="uid://bf1h6jdtxws1s" path="res://scripts/sfx.gd" id="22_sfx"]
+[ext_resource type="PackedScene" path="res://scenes/proyectillo_enemigo.tscn" id="23_enemigo"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_ajx6g"]
 panorama = ExtResource("3_cegan")
@@ -62,10 +63,10 @@ albedo_color = Color(0.15294118, 0.27058825, 0.11764706, 1)
 size = Vector2(60, 60)
 orientation = 1
 
-[node name="Main" type="Node3D" node_paths=PackedStringArray("libro", "mano_izquierda") unique_id=1288509691]
+[node name="Main" type="Node3D" unique_id=1288509691 node_paths=PackedStringArray("mano_izquierda", "libro")]
 script = ExtResource("1_ycdy4")
-libro = NodePath("XROrigin3D/libroMagico")
 mano_izquierda = NodePath("XROrigin3D/LeftHandMesh")
+libro = NodePath("XROrigin3D/libroMagico")
 
 [node name="StartVR" type="Node3D" parent="." unique_id=1237672918]
 script = ExtResource("2_5rtkn")
@@ -179,7 +180,7 @@ script = ExtResource("8_gdsnk")
 grip_action = "pickup"
 
 [node name="libroMagico" parent="XROrigin3D" unique_id=842342573 instance=ExtResource("14_getpj")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5757, 1, -0.2778)
 
 [node name="RightHandMesh" type="XRNode3D" parent="XROrigin3D" unique_id=84293060]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, -0.5)
@@ -213,43 +214,22 @@ script = ExtResource("8_gdsnk")
 grip_action = "pickup"
 
 [node name="AltarMayor" parent="XROrigin3D" unique_id=400000007 instance=ExtResource("21_mayorsc")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.15)
-radius = 2.0
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2216, 0, -0.4446)
 
-[node name="SpellCaster" type="Node3D" parent="XROrigin3D" node_paths=PackedStringArray("major_altar") unique_id=1981080486]
+[node name="SpellCaster" type="Node3D" parent="XROrigin3D" unique_id=1981080486 node_paths=PackedStringArray("major_altar")]
 script = ExtResource("14_cegan")
-major_altar = NodePath("../AltarMayor")
-cast_cost = 20.0
 fireball_scene = ExtResource("14_vivmo")
 water_jet_scene = ExtResource("15_2cqfq")
 bolt_scene = ExtResource("16_yaehf")
 rock_scene = ExtResource("17_074og")
+major_altar = NodePath("../AltarMayor")
+wizard_scene = ExtResource("18_cegan")
+waves = [PackedStringArray("agua", "fuego"), PackedStringArray("tierra", "rayo")]
+enemy_projectile = ExtResource("23_enemigo")
 giant_scene = ExtResource("18_cegan")
-giant_max_health = 8
-giant_scale = 2.6
 
 [node name="Sfx" type="Node" parent="." unique_id=400000010]
 script = ExtResource("22_sfx")
-
-[node name="Wizard" parent="XROrigin3D" unique_id=732175597 instance=ExtResource("18_cegan")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6, 0.1, -5)
-weak_element = "agua"
-max_health = 3
-
-[node name="Wizard2" parent="XROrigin3D" unique_id=1811755116 instance=ExtResource("18_cegan")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 0.1, -5)
-weak_element = "rayo"
-max_health = 3
-
-[node name="Wizard3" parent="XROrigin3D" unique_id=1614786750 instance=ExtResource("18_cegan")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.1, -3.6)
-weak_element = "tierra"
-max_health = 3
-
-[node name="Wizard4" parent="XROrigin3D" unique_id=400000006 instance=ExtResource("18_cegan")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.1, -3.6)
-weak_element = "fuego"
-max_health = 3
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=2021679125]
 stream = SubResource("AudioStreamMicrophone_kp25g")

@@ -45,9 +45,11 @@ func _ready() -> void:
 
 	# ─── LIBRO: configurar y conectar ANTES de Vosk ─────────
 	# (así aunque Vosk falle, el libro igual queda conectado)
-	if libro:
-		libro.visible = false
-	else:
+	# Antes aquí se hacía libro.visible = false, porque el libro sólo
+	# aparecía al pellizcar con la izquierda y así no estorbaba. Ya no
+	# vale: el libro es el blanco que los magos atacan, y si empieza
+	# invisible el jugador no tiene ni idea de qué hay que proteger.
+	if libro == null:
 		push_error("[Main] 'libro' NO asignado en el inspector")
 
 	if mano_izquierda == null:

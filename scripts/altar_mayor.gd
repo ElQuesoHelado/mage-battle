@@ -163,7 +163,7 @@ func _update_label() -> void:
 		_estado.text = "ENERGÍA %d%%" % int(round(get_fill() * 100.0))
 		_estado.modulate = color_encendido
 	else:
-		_estado.text = "DIBUJA UN CÍRCULO"
+		_estado.text = "DIBUJA UN TRAZO"
 		_estado.modulate = Color(0.7, 0.7, 0.75, 1.0)
 
 

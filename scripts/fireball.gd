@@ -283,7 +283,10 @@ func _on_body_entered(body: Node) -> void:
 		return
 	if body == self:
 		return
-	if body.has_method("take_damage"):
+	# Sólo los enemigos del grupo "enemigo". Antes era
+	# "cualquiera que tenga take_damage", lo que hacía que un hechizo
+	# propio pudiera danar el libro mágico que hay que proteger.
+	if body.is_in_group("enemigo") and body.has_method("take_damage"):
 		body.take_damage(damage, element)
 	# La explosión es la que programa el borrado: si además se hiciera
 	# queue_free() aquí, el proyectil desaparecería sin efecto de impacto.
