@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Mage Battle"
 config/tags=PackedStringArray("demo", "official", "xr")
-run/main_scene="uid://dsllxmicl5r2f"
+run/main_scene="uid://c17b4r0eub0qn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 
@@ -38,6 +38,10 @@ version_control/autoload_on_startup=true
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot-xr-tools/plugin.cfg")
+
+[filesystem]
+
+import/blender/enabled=false
 
 [layer_names]
 
@@ -67,7 +71,6 @@ vrs/mode=2
 
 [xr]
 
-openxr/enabled=true
 openxr/reference_space=2
 openxr/foveation_level=3
 openxr/foveation_dynamic=true

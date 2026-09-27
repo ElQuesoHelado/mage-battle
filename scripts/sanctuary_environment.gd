@@ -773,7 +773,7 @@ func _create_rocks_360() -> void:
 	var step := TAU / num_rocks
 	for i in range(num_rocks):
 		var angle := i * step + randf_range(-0.2, 0.2)
-		var dist := randf_range(rock_min_radius, rock_max_radius)
+		var dist := randf_range(10.0, rock_max_radius)
 		var pos := Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
 		pos.y = _get_terrain_height(pos.x, pos.z)
 
@@ -872,7 +872,7 @@ func _create_arena_props() -> void:
 	var num_props := 20
 	for i in range(num_props):
 		var angle := randf_range(0.0, TAU)
-		var dist := randf_range(4.0, 18.0)
+		var dist := randf_range(8.5, 18.0)
 		var pos := Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
 		pos.y = _get_terrain_height(pos.x, pos.z)
 
