@@ -219,13 +219,13 @@ radius = 2.0
 [node name="SpellCaster" type="Node3D" parent="XROrigin3D" node_paths=PackedStringArray("major_altar") unique_id=1981080486]
 script = ExtResource("14_cegan")
 major_altar = NodePath("../AltarMayor")
-cast_cost = 10.0
+cast_cost = 20.0
 fireball_scene = ExtResource("14_vivmo")
 water_jet_scene = ExtResource("15_2cqfq")
 bolt_scene = ExtResource("16_yaehf")
 rock_scene = ExtResource("17_074og")
 giant_scene = ExtResource("18_cegan")
-giant_max_health = 14
+giant_max_health = 8
 giant_scale = 2.6
 
 [node name="Sfx" type="Node" parent="." unique_id=400000010]

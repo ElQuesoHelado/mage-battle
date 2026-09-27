@@ -72,13 +72,15 @@ static func weakness_text(weak: String) -> String:
 ## Altar Mayor: el único que habilita el lanzamiento. Su energía la
 ## recarga el jugador dibujando círculos.
 @export var major_altar: AltarMayor
-@export var cast_cost: float = 10.0
+@export var cast_cost: float = 20.0
 ## En false se puede hechizar sin energía. Sólo para depurar.
 @export var require_energy: bool = true
 
 @export_group("Jefe gigante")
 @export var giant_scene: PackedScene
-@export var giant_max_health: int = 14
+## Con la debilidad rotando, sólo uno de cada cuatro elementos le hace
+## daño. Con 14 PV hacían falta unos 22 trazos de mano sólo para matarlo.
+@export var giant_max_health: int = 8
 @export var giant_scale: float = 2.6
 ## Distancia a la que aparece el jefe, por delante del jugador.
 @export var giant_spawn_distance: float = 4.5
@@ -165,11 +167,11 @@ func _connect_altar() -> void:
 
 	# El círculo se dibuja con la varita, que cuelga del mando derecho.
 	var wand := get_tree().get_first_node_in_group("wand_drawing")
-	if wand != null and wand.has_signal("circle_drawn"):
-		if not wand.circle_drawn.is_connected(_on_circle_drawn):
-			wand.circle_drawn.connect(_on_circle_drawn)
+	if wand != null and wand.has_signal("stroke_finished"):
+		if not wand.stroke_finished.is_connected(_on_stroke_finished):
+			wand.stroke_finished.connect(_on_stroke_finished)
 	else:
-		push_warning("[SpellSystem] no se encontró WandDrawing: el círculo no recargará")
+		push_warning("[SpellSystem] no se encontró WandDrawing: el altar no se podrá recargar")
 
 
 func _connect_voice() -> void:
@@ -214,14 +216,20 @@ func _process(delta: float) -> void:
 		_set_hud(_build_hud_text())
 
 
+## Lo llama el jefe cuando gira su debilidad, para que el HUD se
+## entere aunque esté detrás del jugador.
+func notify_weakness_changed(_weak_element: String) -> void:
+	_hud_dirty = true
+
+
 # -----------------------------------------------------------------
-# Círculo → energía
+# Trazo → energía
 # -----------------------------------------------------------------
 
-func _on_circle_drawn() -> void:
+func _on_stroke_finished(gain: float) -> void:
 	if major_altar == null or not is_instance_valid(major_altar):
 		return
-	major_altar.add_circle()
+	major_altar.add_charge(gain)
 
 
 func _on_energy_gained(amount: float) -> void:
@@ -354,14 +362,12 @@ func _spawn_giant() -> void:
 	pos.y = 0.0
 
 	var giant: Node3D = giant_scene.instantiate()
-	get_tree().current_scene.add_child(giant)
-	giant.global_position = pos
-	# El jefe mira al jugador, no al revés.
-	if origin.distance_to(pos) > 0.01:
-		giant.look_at(origin, Vector3.UP)
 
-	# weakness_element vacío => inmune a las debilidades: cualquier
-	# elemento le hace daño.
+	# Estas propiedades se fijan ANTES de añadirlo al árbol: wizard.gd
+	# decide su debilidad inicial y se pinta con ella dentro de
+	# _ready(), así que arrives tarde y saldría con la del material
+	# original en vez de la del jefe.
+	giant.rotates_weakness = true
 	giant.max_health = giant_max_health
 	giant.death_cleanup_delay = giant_cleanup_delay
 	giant.health = giant_max_health
@@ -369,8 +375,14 @@ func _spawn_giant() -> void:
 	giant.base_scale = Vector3.ONE * giant_scale
 	giant.scale = giant.base_scale
 
+	get_tree().current_scene.add_child(giant)
+	giant.global_position = pos
+	# El jefe mira al jugador, no al revés.
+	if origin.distance_to(pos) > 0.01:
+		giant.look_at(origin, Vector3.UP)
+
 	_giant_spawned = true
-	_set_feedback("¡El GRAN MAGO se alza! Aguanta lo que sea.")
+	_set_feedback("¡El GRAN MAGO se alza! Su color dice qué le pega.")
 
 
 func _finish() -> void:
@@ -389,8 +401,14 @@ func _finish() -> void:
 func _build_hud_text() -> String:
 	var lines: Array[String] = []
 
+	# El jefe puede estar detrás del jugador, así que su debilidad
+	# se repite en el HUD además de estar en su etiqueta.
 	if _giant_spawned and not _finished:
-		lines.append("GRAN MAGO: aguanta cualquier elemento")
+		var weak := _giant_weakness()
+		if weak.is_empty():
+			lines.append("GRAN MAGO: le da igual el elemento")
+		else:
+			lines.append("GRAN MAGO · necesita %s" % label_of(weak))
 
 	lines.append(_energy_line())
 
@@ -398,6 +416,13 @@ func _build_hud_text() -> String:
 		lines.append(_feedback)
 
 	return "\n".join(lines)
+
+
+func _giant_weakness() -> String:
+	var giant := get_tree().get_first_node_in_group("giant")
+	if giant == null:
+		return ""
+	return String(giant.weak_element)
 
 
 ## Barra de energía con 8 bloques. Es texto plano, no geometría, así que

@@ -15,6 +15,26 @@ signal damage_rejected(weak_element: String)
 ## justo el valor que necesita el jefe.
 @export var weak_element: String = ""
 
+## Rota su debilidad en cada golpe que recibe daño. Es lo del jefe
+## gigante: va pasando por los cuatro elementos, y su color va con la
+## debilidad, así que el color ES la pista.
+##
+## Los magos normales lo dejan en false y su debilidad es fija.
+@export var rotates_weakness: bool = false
+## Orden por el que va rotando. Al ser fijo se puede aprender.
+@export var weakness_order: PackedStringArray = [
+	"fuego", "agua", "rayo", "tierra",
+]
+
+## Mira al jugador. El ángulo objetivo se recalcula cada
+## face_refresh_seconds y luego se interpola, para no repetir un
+## cálculo por frame sin que además el modelo dé tirones.
+@export var face_player: bool = true
+@export var face_refresh_seconds: float = 2.0
+@export var face_speed: float = 4.0
+## Grados a sumar por si el modelo sale mirando al revés.
+@export var face_offset_degrees: float = 0.0
+
 ## Reduce el tamaño del mago conforme le queda vida (jefe gigante).
 @export var shrinks_on_damage: bool = false
 ## Tamaño a vida completa.
@@ -35,6 +55,12 @@ var health: int
 var is_dead: bool = false
 
 var _weakness_label: Label3D
+## Posición dentro de weakness_order del jefe.
+var _weakness_index: int = 0
+## Ángulo Y al que se quiere mirar. Lo recalcula un temporizador, no
+## el bucle de física.
+var _target_yaw: float = 0.0
+var _face_timer: Timer
 
 
 func _ready() -> void:
@@ -43,13 +69,56 @@ func _ready() -> void:
 	playback.start("idle")
 	add_to_group("mages")
 	scale = base_scale
+
+	# El jefe decide su debilidad ANTES de pintarse. Si _tint() corriera
+	# antes, vería weak_element vacío y saldría sin pintar de blanco
+	# hasta el primer golpe.
+	if rotates_weakness:
+		add_to_group("giant")
+		_weakness_index = _order_index(weak_element)
+		weak_element = weakness_order[_weakness_index]
+
 	_tint()
 	_build_weakness_label()
+
+	if face_player:
+		_target_yaw = _yaw_to_player()
+		_face_timer = Timer.new()
+		_face_timer.wait_time = maxf(0.2, face_refresh_seconds)
+		_face_timer.autostart = true
+		_face_timer.timeout.connect(_refresh_face_target)
+		add_child(_face_timer)
+
+
+## Ángulo Y con el que el nodo debe quedar mirando al jugador.
+## look_at() apunta el -Z, que es hacia donde mira el modelo.
+func _yaw_to_player() -> float:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return rotation.y
+	var to_player: Vector3 = cam.global_position - global_position
+	to_player.y = 0.0
+	if to_player.length() < 0.05:
+		return rotation.y
+	var target: float = atan2(-to_player.x, -to_player.z)
+	return target + deg_to_rad(face_offset_degrees)
+
+
+func _refresh_face_target() -> void:
+	if is_dead or is_queued_for_deletion():
+		return
+	_target_yaw = _yaw_to_player()
 
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
+
+	# Giro suave hacia el ángulo cacheado. Una operación por mago.
+	if face_player:
+		var weight: float = clampf(face_speed * delta, 0.0, 1.0)
+		rotation.y = lerp_angle(rotation.y, _target_yaw, weight)
+
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	else:
@@ -100,8 +169,41 @@ func take_damage(amount: int = 1, element: String = "") -> void:
 		health = 0
 	if shrinks_on_damage:
 		_apply_scale()
+
+	# La debilidad sólo avanza cuando el golpe ha hecho daño. Si
+	# advanced también al fallar, el color cambiaría en cada intento y
+	# no habría forma de apuntar a él.
+	if rotates_weakness and health > 0:
+		_advance_weakness()
+
 	if health == 0:
 		_die()
+
+
+## Pasa a la siguiente debilidad del ciclo. El color y la etiqueta se
+## repintan porque van ligados a `weak_element`.
+func _advance_weakness() -> void:
+	if weakness_order.is_empty():
+		return
+	_weakness_index = (_weakness_index + 1) % weakness_order.size()
+	weak_element = weakness_order[_weakness_index]
+	_tint()
+	_update_weakness_label()
+	_set_feedback_weakness()
+
+
+## Avisa por la escena de que el jefe ha cambiado de color, para que el
+## HUD lo muestre aunque esté detrás del jugador.
+func _set_feedback_weakness() -> void:
+	var director := get_tree().get_first_node_in_group("spell_system")
+	if director != null and director.has_method("notify_weakness_changed"):
+		director.notify_weakness_changed(weak_element)
+
+
+## Índice de un elemento dentro de weakness_order.
+func _order_index(element: String) -> int:
+	var idx: int = weakness_order.find(element)
+	return idx if idx >= 0 else 0
 
 
 ## Escala proporcional a la vida que queda.
@@ -216,11 +318,18 @@ func _build_weakness_label() -> void:
 	_weakness_label.pixel_size = 0.0012
 	_weakness_label.position = Vector3(0.0, 2.2, 0.0)
 
+	_update_weakness_label()
+	add_child(_weakness_label)
+
+
+## Repinta la etiqueta. Se separa de la construcción porque el jefe la
+## cambia cada vez que gira su debilidad.
+func _update_weakness_label() -> void:
+	if _weakness_label == null:
+		return
 	if weak_element.is_empty():
 		_weakness_label.text = "ANY"
 		_weakness_label.modulate = Color(0.85, 0.3, 0.85)
 	else:
 		_weakness_label.text = "↓ %s" % SpellSystem.label_of(weak_element)
 		_weakness_label.modulate = SpellSystem.color_of(weak_element)
-
-	add_child(_weakness_label)

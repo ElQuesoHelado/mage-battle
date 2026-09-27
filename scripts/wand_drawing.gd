@@ -31,14 +31,17 @@ const ShapeRecognizer = preload("res://scripts/shape_recognizer.gd")
 
 @export var trail_width: float = 0.03  # 2 cm. Súbelo/bájalo al gusto
 
-## Reconoce el círculo al soltar el puño. Es lo que recarga el altar
-## mayor. Usa recognize_circle_only(), que sólo prueba esa plantilla.
-@export var recognize_circle: bool = true
-
-## Umbral de aceptación del círculo. Negativo = usar
-## ShapeRecognizer.CIRCLE_THRESHOLD. Súbelo si en el visor resulta
-## demasiado exigente y el círculo no se reconoce.
-@export var circle_threshold: float = -1.0
+## Carga del altar mayor por longitud de trazo. Antes era un círculo,
+## pero dibujar un círculo en el aire con la mano resulta demasiado
+## complejo; ahora da igual la forma y sólo cuenta cuánto recorriste
+## la mano. Un barrido, ir y volver, o un círculo: todo vale.
+@export var charge_on_stroke: bool = true
+## Por debajo de esta longitud no cuenta nada: un tirón no recarga.
+@export var charge_min_length: float = 0.10
+## A partir de esta longitud el trazo da la carga máxima.
+@export var charge_full_length: float = 0.50
+## Energía máxima que aporta un solo trazo.
+@export var charge_max: float = 50.0
 
 ## Malla de la varita. Si se deja vacía se usa el nodo padre, que es lo
 ## normal (WandTip cuelga de WandMesh).
@@ -48,7 +51,9 @@ const ShapeRecognizer = preload("res://scripts/shape_recognizer.gd")
 @export var show_only_when_gripped: bool = true
 
 signal shape_recognized(shape_name: String, points: Array)
-signal circle_drawn
+## Al soltar el puño, con la energía que ha apportado el trazo.
+## 0 significa que el trazo fue demasiado corto.
+signal stroke_finished(gain: float)
 signal drawing_started
 signal drawing_cancelled
 
@@ -312,13 +317,24 @@ func _finish_drawing() -> void:
 		var shape: String = ShapeRecognizer.recognize(_points, _plane_normal)
 		shape_recognized.emit(shape, _points.duplicate())
 
-	if recognize_circle:
-		var threshold: float = circle_threshold if circle_threshold > 0.0 \
-			else ShapeRecognizer.CIRCLE_THRESHOLD
-		if ShapeRecognizer.recognize_circle_only(_points, _plane_normal, threshold):
-			circle_drawn.emit()
+	if charge_on_stroke:
+		var gain := _charge_for(path_length)
+		if gain > 0.0:
+			stroke_finished.emit(gain)
 
 	_clear_trail()
+
+
+## Energía que aporta un trazo de la longitud dada. Lineal entre el
+## mínimo y el máximo, y con tope: dos trazos largos llenan el altar.
+func _charge_for(path_length: float) -> float:
+	if path_length <= charge_min_length:
+		return 0.0
+	var span: float = charge_full_length - charge_min_length
+	if span <= 0.001:
+		return charge_max
+	var t: float = clampf((path_length - charge_min_length) / span, 0.0, 1.0)
+	return charge_max * t
 
 
 func _estimate_plane_normal(pts: Array[Vector3]) -> Vector3:

@@ -10,12 +10,8 @@ class_name AltarMayor
 # ─── Economía de energía ──────────────────────────────────────
 ## Energía máxima. De aquí sale el número de la barra del HUD.
 @export var energia_max: float = 100.0
-## Cuánto suma cada círculo.
-@export var circle_gain: float = 40.0
-## La energía baja sola. Un valor alto hace la partida más tensa.
-@export var drain_per_second: float = 4.0
-## Energía mínima para poder lanzar.
-@export var min_to_cast: float = 10.0
+## Energía mínima para poder lanzar. Igual al coste de un hechizo.
+@export var min_to_cast: float = 20.0
 
 # ─── Detección ────────────────────────────────────────────────
 ## Radio horizontal a la que el jugador cuenta como "en el altar".
@@ -65,11 +61,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# Desgaste por tiempo. Se detiene al llegar a cero para no quedar
-	# en negativo y mostrar barras raras.
-	if energia > 0.0:
-		energia = maxf(0.0, energia - drain_per_second * delta)
-
+	# Sin desgaste por tiempo: la energía sólo baja al lanzar. Aquí ya
+	# no hay nada que descontar, sólo se animan el nucleo y el anillo.
 	var inside := _is_player_inside()
 	if inside != _player_inside:
 		_player_inside = inside
@@ -94,11 +87,12 @@ func _process(delta: float) -> void:
 
 # ─── API ───────────────────────────────────────────────────────
 
-## Un círculo recarga. Devuelve lo que realmente se ganó (0 si ya
-## estaba lleno).
-func add_circle() -> float:
+## Recarga por trazo. La cantidad la calcula wand_drawing a partir de
+## la longitud del movimiento de la mano. Devuelve lo que realmente se
+## ganó (0 si ya estaba lleno).
+func add_charge(amount: float) -> float:
 	var before := energia
-	energia = minf(energia_max, energia + circle_gain)
+	energia = minf(energia_max, energia + amount)
 	var gained := energia - before
 	if gained > 0.0:
 		energy_gained.emit(gained)
