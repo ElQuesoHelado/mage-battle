@@ -1,6 +1,7 @@
 # Blender v2.93.0 OBJ File: 'Orangutan.blend'
 # www.blender.org
-mtllib Orangutan.mtl
+# La línea mtllib se eliminó: el .mtl no venía con el archivo y el
+# importador fallaba. El material se asigna desde spell_caster.gd.
 o Orangutan_Cube.008
 v 0.255475 -0.013554 0.064656
 v 0.333158 0.026797 -0.042046

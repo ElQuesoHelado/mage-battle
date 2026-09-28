@@ -9,13 +9,28 @@ signal pose_recentered
 ## We'll find the closest matching one.
 @export var maximum_refresh_rate: int = 90
 
+## Si es true, el juego se cierra cuando no hay runtime de OpenXR.
+## Déjalo en false para poder abrir el proyecto en un PC sin visor:
+## el juego sigue en modo escritorio y se puede revisar la escena.
+@export var quit_if_no_xr: bool = false
+
+## Altura de la cámara de respaldo para el modo escritorio.
+@export var desktop_camera_height: float = 1.7
+
 var xr_interface: OpenXRInterface
 var xr_is_focused: bool = false
+var xr_is_active: bool = false
 
 
 ## Get our OpenXR Interface.
 func get_xr_interface() -> OpenXRInterface:
 	return xr_interface
+
+
+## true si hay sesión de VR real. El HUD y la interfaz lo usan para
+## cambiar de comportamiento en modo escritorio.
+func is_xr_active() -> bool:
+	return xr_is_active
 
 
 # Called when the node enters the scene tree for the first time.
@@ -43,10 +58,58 @@ func _ready() -> void:
 		xr_interface.session_focussed.connect(_on_openxr_focused_state)
 		xr_interface.session_stopping.connect(_on_openxr_stopping)
 		xr_interface.pose_recentered.connect(_on_openxr_pose_recentered)
+		xr_is_active = true
 	else:
-		# We couldn't start OpenXR.
+		# No hay runtime de OpenXR: PC sin visor, o runtime mal
+		# configurado en el sistema.
 		print("OpenXR not instantiated!")
-		get_tree().quit()
+		if quit_if_no_xr:
+			get_tree().quit()
+			return
+		push_warning(
+			"OpenXR no disponible: el juego sigue en modo escritorio. "
+			+ "El seguimiento de manos y los hechizos por gestos quedan "
+			+ "desactivados."
+		)
+		_setup_desktop_camera()
+
+
+## Sin una cámara activa, el modo escritorio mostraría una pantalla
+## negra. Se crea una Camera3D normal a la altura de la cabeza.
+func _setup_desktop_camera() -> void:
+	if get_viewport().get_camera_3d():
+		return
+
+	var cam := Camera3D.new()
+	cam.name = "DesktopCamera"
+
+	var origin := _find_xr_origin()
+	if origin:
+		# top_level para que la cámara no herede la escala del origen.
+		cam.top_level = true
+		origin.add_child(cam)
+	else:
+		add_child(cam)
+
+	cam.position = Vector3(0.0, desktop_camera_height, 0.0)
+	cam.current = true
+
+
+## StartVR es hermano del XROrigin3D, no hijo, así que hay que mirar
+## también entre los hermanos.
+func _find_xr_origin() -> XROrigin3D:
+	var n: Node = self
+	while n:
+		if n is XROrigin3D:
+			return n
+		n = n.get_parent()
+
+	var parent := get_parent()
+	if parent:
+		for sibling in parent.get_children():
+			if sibling is XROrigin3D:
+				return sibling
+	return null
 
 
 # Handle OpenXR session ready.

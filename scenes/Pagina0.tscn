@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://0kyjle0m58x6"]
+
+[ext_resource type="PackedScene" uid="uid://cbrpdihiqxara" path="res://assets/magebook/page1.glb" id="1_55utm"]
+
+[node name="Pagina0" type="Node3D" unique_id=234899018]
+
+[node name="page1" parent="." unique_id=660535281 instance=ExtResource("1_55utm")]
+transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, 0, 0, 0)

@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://iewip27t00eq"]
+
+[ext_resource type="PackedScene" uid="uid://bonr3chjdnrlk" path="res://assets/book/alchemists_book.glb" id="1_ble1a"]
+
+[node name="Book" type="Node3D" unique_id=740762412]
+
+[node name="Sketchfab_Scene" parent="." unique_id=1047092099 instance=ExtResource("1_ble1a")]
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 0, 0, 0)

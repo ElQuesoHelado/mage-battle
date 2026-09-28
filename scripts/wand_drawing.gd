@@ -1,6 +1,8 @@
 extends Node3D
 class_name WandDrawing
 
+const ShapeRecognizer = preload("res://scripts/shape_recognizer.gd")
+
 ## Ya no se usa XRController3D. Todo el input viene del hand tracker óptico.
 @export var hand_tracker_name: String = "/user/hand_tracker/right"
 
@@ -19,9 +21,39 @@ class_name WandDrawing
 ## sale perpendicular al plano del dibujo (como un portal).
 @export var use_finger_direction_for_cast: bool = false
 
-@export var debug_log_trigger_state: bool = true
+## El reconector de figuras es caro (compara contra 6 plantillas con
+## 32 desplazamientos y 2 direcciones cada una). Con el lanzamiento por
+## voz en los altares el resultado ya no se usa, así que va apagado: el
+## rastro de luz del puño se sigue dibujando igual.
+@export var recognize_shapes: bool = false
+
+@export var debug_log_trigger_state: bool = false
+
+@export var trail_width: float = 0.03  # 2 cm. Súbelo/bájalo al gusto
+
+## Carga del altar mayor por longitud de trazo. Antes era un círculo,
+## pero dibujar un círculo en el aire con la mano resulta demasiado
+## complejo; ahora da igual la forma y sólo cuenta cuánto recorriste
+## la mano. Un barrido, ir y volver, o un círculo: todo vale.
+@export var charge_on_stroke: bool = true
+## Por debajo de esta longitud no cuenta nada: un tirón no recarga.
+@export var charge_min_length: float = 0.10
+## A partir de esta longitud el trazo da la carga máxima.
+@export var charge_full_length: float = 0.50
+## Energía máxima que aporta un solo trazo.
+@export var charge_max: float = 50.0
+
+## Malla de la varita. Si se deja vacía se usa el nodo padre, que es lo
+## normal (WandTip cuelga de WandMesh).
+@export var mesh_to_toggle: Node3D
+
+## La varita sólo se ve cuando está empuñada. Con false se ve siempre.
+@export var show_only_when_gripped: bool = true
 
 signal shape_recognized(shape_name: String, points: Array)
+## Al soltar el puño, con la energía que ha apportado el trazo.
+## 0 significa que el trazo fue demasiado corto.
+signal stroke_finished(gain: float)
 signal drawing_started
 signal drawing_cancelled
 
@@ -37,31 +69,53 @@ var _trail_mesh: MeshInstance3D
 var _immediate_mesh: ImmediateMesh
 var _hand_tracker: XRHandTracker
 var _debug_timer: float = 0.0
+var _wand_mesh: Node3D
 
 const MAX_POINTS := 400
 
 
+
 func _ready() -> void:
+	# El director de hechizos busca la varita por este grupo para
+	# conectar el círculo que recarga el Altar Mayor.
+	add_to_group("wand_drawing")
 	await get_tree().process_frame
 	_hand_tracker = XRServer.get_tracker(hand_tracker_name) as XRHandTracker
 	if not _hand_tracker:
 		push_warning("WandDrawing: no se encontró XRHandTracker '%s'" % hand_tracker_name)
 
+	if show_only_when_gripped:
+		_wand_mesh = mesh_to_toggle if mesh_to_toggle != null else (get_parent() as Node3D)
+		if _wand_mesh != null:
+			_wand_mesh.visible = false
+
 	if draw_trail:
+		# El rastro es top_level, así que se cuelga de la escena para que
+		# no dependa de la jerarquía de la varita.
+		var host := get_tree().current_scene
+		if host == null:
+			push_warning("WandDrawing: no hay escena actual, el rastro no se creará")
+			return
 		_immediate_mesh = ImmediateMesh.new()
 		_trail_mesh = MeshInstance3D.new()
 		_trail_mesh.mesh = _immediate_mesh
 		_trail_mesh.material_override = trail_material if trail_material else _default_trail_material()
 		_trail_mesh.top_level = true
-		get_tree().current_scene.add_child.call_deferred(_trail_mesh)
+		host.add_child.call_deferred(_trail_mesh)
 
 
 func _default_trail_material() -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1.0, 0.6, 0.1)
+	mat.albedo_color = Color(1.0, 0.7, 0.2)
 	mat.emission_enabled = true
 	mat.emission = Color(1.0, 0.5, 0.0)
+	mat.emission_energy_multiplier = 4.0        # antes no lo tenías
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD   # mezcla aditiva = brillo
+	mat.disable_receive_shadows = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED          # <-- NUEVO: visible por ambos lados
+	mat.vertex_color_use_as_albedo = true                 # <-- NUEVO: usa el gradiente
 	return mat
 
 
@@ -137,17 +191,24 @@ func _sync_transform_to_hand() -> void:
 
 func _process(delta: float) -> void:
 	if not _hand_tracker or not _hand_tracker.has_tracking_data:
-		#print("No hand tracker")
 		return
 
 	_sync_transform_to_hand()
 
 	var closure := get_fist_closure()
-	
-	
+
+	# La varita aparece al empuñarla y desaparece al soltarla, con el
+	# mismo umbral que dispara el dibujo.
+	if _wand_mesh != null:
+		var gripped := closure >= fist_on_threshold
+		if _wand_mesh.visible != gripped:
+			_wand_mesh.visible = gripped
+
+	# Histéresis: se empieza a dibujar con un puño más cerrado del que
+	# hace falta para soltar. Sin esto el trazo parpadea al borde del
+	# umbral.
 	var pressed: bool
 	if _is_drawing:
-		print(closure)
 		pressed = closure >= fist_off_threshold
 	else:
 		pressed = closure >= fist_on_threshold
@@ -156,11 +217,8 @@ func _process(delta: float) -> void:
 		_debug_timer += delta
 		if _debug_timer >= 1.0:
 			_debug_timer = 0.0
-			#print("[WandDrawing][DEBUG] closure=", closure,
-				#" pressed=", pressed,
-				#" is_drawing=", _is_drawing,
-				#" puntos=", _points.size(),
-				#" tip_pos=", global_position)
+			print("[WandDrawing] closure=%.2f pressed=%s puntos=%d"
+				% [closure, pressed, _points.size()])
 
 	if pressed and not _is_drawing:
 		_start_drawing()
@@ -175,7 +233,6 @@ func _start_drawing() -> void:
 	_points.clear()
 	_plane_normal = get_aim_direction()
 	_add_point(global_position)
-	print("[WandDrawing] INICIO trazo")
 	drawing_started.emit()
 
 
@@ -191,13 +248,48 @@ func _update_trail() -> void:
 	if not draw_trail or not _immediate_mesh:
 		return
 	_immediate_mesh.clear_surfaces()
-	if _points.size() < 2:
+	var n := _points.size()
+	if n < 2:
 		return
-	_immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
-	for p in _points:
-		_immediate_mesh.surface_add_vertex(p)
-	_immediate_mesh.surface_end()
 
+	var half := trail_width * 0.5
+	var up := _plane_normal.normalized()
+	if up.length() < 0.001:
+		up = Vector3.UP
+
+	_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+
+	for i in n:
+		# Tangente: dirección del trazo en este punto
+		var tangent: Vector3
+		if i == 0:
+			tangent = _points[1] - _points[0]
+		elif i == n - 1:
+			tangent = _points[n - 1] - _points[n - 2]
+		else:
+			tangent = _points[i + 1] - _points[i - 1]
+
+		if tangent.length() < 0.0001:
+			tangent = Vector3.FORWARD
+		tangent = tangent.normalized()
+
+		# Perpendicular dentro del plano del dibujo
+		var perp := tangent.cross(up)
+		if perp.length() < 0.001:
+			perp = tangent.cross(Vector3.RIGHT)
+		perp = perp.normalized()
+
+		# Gradiente de color del inicio a la punta
+		var t := float(i) / float(n - 1)
+		var c := Color(1.0, 0.3, 0.0).lerp(Color(1.0, 1.0, 0.6), t)
+
+		# Dos vértices por punto: uno a cada lado
+		_immediate_mesh.surface_set_color(c)
+		_immediate_mesh.surface_add_vertex(_points[i] + perp * half)
+		_immediate_mesh.surface_set_color(c)
+		_immediate_mesh.surface_add_vertex(_points[i] - perp * half)
+
+	_immediate_mesh.surface_end()
 
 func _finish_drawing() -> void:
 	_is_drawing = false
@@ -215,19 +307,34 @@ func _finish_drawing() -> void:
 		last_cast_direction = n
 
 	var path_length := _compute_path_length(_points)
-	print("[WandDrawing] FIN trazo: puntos=", _points.size(), " longitud=", path_length)
 
 	if _points.size() < min_points_for_shape or path_length < min_path_length:
-		print("[WandDrawing] trazo DESCARTADO")
 		_clear_trail()
 		drawing_cancelled.emit()
 		return
 
-	var shape := ShapeRecognizer.recognize(_points, _plane_normal)
-	print("[WandDrawing] figura reconocida: ", shape, " (", _points.size(), " puntos)")
+	if recognize_shapes:
+		var shape: String = ShapeRecognizer.recognize(_points, _plane_normal)
+		shape_recognized.emit(shape, _points.duplicate())
 
-	shape_recognized.emit(shape, _points.duplicate())
+	if charge_on_stroke:
+		var gain := _charge_for(path_length)
+		if gain > 0.0:
+			stroke_finished.emit(gain)
+
 	_clear_trail()
+
+
+## Energía que aporta un trazo de la longitud dada. Lineal entre el
+## mínimo y el máximo, y con tope: dos trazos largos llenan el altar.
+func _charge_for(path_length: float) -> float:
+	if path_length <= charge_min_length:
+		return 0.0
+	var span: float = charge_full_length - charge_min_length
+	if span <= 0.001:
+		return charge_max
+	var t: float = clampf((path_length - charge_min_length) / span, 0.0, 1.0)
+	return charge_max * t
 
 
 func _estimate_plane_normal(pts: Array[Vector3]) -> Vector3:

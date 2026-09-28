@@ -1,0 +1,42 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/proyectillo_enemigo.gd" id="1_script"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_core"]
+radius = 0.13
+height = 0.26
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereMesh" id="SphereMesh_glow"]
+radius = 0.3
+height = 0.6
+radial_segments = 8
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="Mat_core"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.95, 0.7, 1, 0.95)
+emission_enabled = true
+emission = Color(0.7, 0.15, 0.95, 1)
+emission_energy_multiplier = 4.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_glow"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.7, 0.2, 0.95, 0.16)
+emission_enabled = true
+emission = Color(0.6, 0.1, 0.9, 1)
+emission_energy_multiplier = 2.5
+
+[node name="ProyectilloEnemigo" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Nucleo" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_core")
+material_override = SubResource("Mat_core")
+
+[node name="Halo" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_glow")
+material_override = SubResource("Mat_glow")

@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bphj6pckfnfp4"]
+
+[ext_resource type="Script" uid="uid://cpoi42mmrn8an" path="res://scripts/fireball.gd" id="1_3s14c"]
+
+[node name="Fireball" type="RigidBody3D" unique_id=2105343654]
+script = ExtResource("1_3s14c")

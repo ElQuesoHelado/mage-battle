@@ -1,55 +1,179 @@
 class_name ShapeRecognizer
 extends RefCounted
 
-const CORNER_ANGLE_THRESHOLD_DEG := 55.0
-const DOUGLAS_PEUCKER_EPSILON := 0.035
-const CIRCLE_VARIANCE_THRESHOLD := 0.45
+## Reconocedor tipo $1 Unistroke simplificado, con matching por
+## desplazamiento circular. El trazo se normaliza (centro + escala)
+## y se remuestrea a N puntos. Se compara contra cada plantilla probando
+## TODOS los puntos de inicio posibles y ambas direcciones.
+##
+## Eso lo hace robusto a:
+##   - que el usuario empiece a dibujar por cualquier vértice,
+##   - que dibuje en sentido horario o antihorario,
+##   - formas curvas (círculo, corazón) donde el "primer punto" no es fiable.
+
+const N := 32
+const MATCH_THRESHOLD := 0.20
+
+
+## Poner a true para volcar los scores por figura. En un visor esto
+## genera decenas de líneas por segundo, así que va apagado.
+const DEBUG := false
 
 
 static func recognize(points_3d: Array[Vector3], plane_normal: Vector3) -> String:
 	if points_3d.size() < 6:
 		return "unknown"
 
+	var pts := _prepare(points_3d, plane_normal)
+
+	var templates := _get_templates()
+	var best_name := "unknown"
+	var best_score := INF
+
+	if DEBUG:
+		print("[ShapeRecognizer] --- scores ---")
+	for shape_name in templates.keys():
+		var tmpl: PackedVector2Array = _normalize(_resample(templates[shape_name], N))
+		var score := _best_match_distance(pts, tmpl)
+		if DEBUG:
+			print("[ShapeRecognizer]   %-9s => %.3f" % [shape_name, score])
+		if score < best_score:
+			best_score = score
+			best_name = shape_name
+
+	var result := best_name if best_score < MATCH_THRESHOLD else "unknown"
+	if DEBUG:
+		print("[ShapeRecognizer] elegido=%s (%.3f, umbral=%.3f)"
+			% [result, best_score, MATCH_THRESHOLD])
+	return result
+
+
+## Proyección al plano, remuestreo a N puntos y normalización. Se
+## extrajo para que recognize() no tenga que repetirlo.
+static func _prepare(points_3d: Array[Vector3], plane_normal: Vector3) -> PackedVector2Array:
 	var centroid := Vector3.ZERO
 	for p in points_3d:
 		centroid += p
 	centroid /= points_3d.size()
+	return _normalize(_resample(_project_to_plane(points_3d, plane_normal, centroid), N))
 
-	var points_2d := _project_to_plane(points_3d, plane_normal, centroid)
-	var simplified := _douglas_peucker(points_2d, DOUGLAS_PEUCKER_EPSILON)
-	var corners := _count_corners(simplified)
-	var circularity := _circularity_score(points_2d)
 
-	print("[ShapeRecognizer] puntos=%d simplificado=%d esquinas=%d circularidad=%.3f" % [
-		points_3d.size(), simplified.size(), corners, circularity
+# ---------------------------------------------------------------------------
+# Matching
+# ---------------------------------------------------------------------------
+
+## Distancia mínima probando todas las rotaciones de inicio y ambas direcciones.
+static func _best_match_distance(pts: PackedVector2Array, tmpl: PackedVector2Array) -> float:
+	var d_fwd := _min_offset_distance(pts, tmpl)
+	var rev := pts.duplicate()
+	rev.reverse()
+	var d_rev := _min_offset_distance(rev, tmpl)
+	return minf(d_fwd, d_rev)
+
+
+## Prueba los N desplazamientos circulares y devuelve el de menor distancia.
+static func _min_offset_distance(pts: PackedVector2Array, tmpl: PackedVector2Array) -> float:
+	var best := INF
+	var n := pts.size()
+	for offset in range(n):
+		var total := 0.0
+		for i in range(n):
+			total += pts[(i + offset) % n].distance_to(tmpl[i])
+		var d := total / float(n)
+		if d < best:
+			best = d
+	return best
+
+
+# ---------------------------------------------------------------------------
+# Plantillas
+# ---------------------------------------------------------------------------
+
+static func _get_templates() -> Dictionary:
+	return {
+		"circle":   _make_circle(),
+		"triangle": _make_triangle(),
+		"lt": 		_make_lt(),
+		"star":     _make_star(),
+		"heart":    _make_heart(),
+		"bolt":     _make_bolt(),
+	}
+
+
+static func _make_circle() -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in range(N):
+		var a := TAU * float(i) / float(N)
+		pts.append(Vector2(cos(a), sin(a)))
+	return pts
+
+
+static func _make_triangle() -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in range(3):
+		var a := -PI * 0.5 + TAU * float(i) / 3.0
+		pts.append(Vector2(cos(a), sin(a)))
+	pts.append(pts[0])
+	return pts
+
+
+static func _make_lt() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2( 1.0, -1.0),   # arriba derecha
+		Vector2(-1.0,  0.0),   # punta izquierda
+		Vector2( 1.0,  1.0),   # abajo derecha
 	])
 
-	if circularity <= CIRCLE_VARIANCE_THRESHOLD and corners <= 1:
-		return "circle"
+static func _make_star() -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in range(10):
+		var a := -PI * 0.5 + PI * float(i) / 5.0
+		var r := 1.0 if i % 2 == 0 else 0.42
+		pts.append(Vector2(cos(a) * r, sin(a) * r))
+	pts.append(pts[0])
+	return pts
 
-	if corners == 2:
-		return "triangle"
 
-	if corners == 3:
-		return "square"
+static func _make_heart() -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var samples := 40
+	for i in range(samples):
+		var t := TAU * float(i) / float(samples)
+		var x := 16.0 * pow(sin(t), 3.0)
+		var y := -(13.0 * cos(t) - 5.0 * cos(2.0 * t)
+			- 2.0 * cos(3.0 * t) - cos(4.0 * t))
+		pts.append(Vector2(x, y) / 16.0)
+	pts.append(pts[0])
+	return pts
 
-	if circularity <= CIRCLE_VARIANCE_THRESHOLD * 1.4:
-		return "circle"
 
-	return "unknown"
+## Rayo: zigzag en Z. Más vértices que antes para que no sea "difuso"
+## y no le gane a cualquier trazo abierto.
+## Rayo: zigzag compacto de 3 segmentos (4 puntos).
+## Mantenerlo con pocos puntos evita que se "reparta" por todo el cuadro
+## y gane contra trazos que no son bolt.
+static func _make_bolt() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(-0.4, -1.0),   # arriba izquierda
+		Vector2( 0.4, -0.35),  # quiebre 1 (derecha)
+		Vector2(-0.4,  0.35),  # quiebre 2 (izquierda)
+		Vector2( 0.4,  1.0),   # abajo derecha
+	])
 
+
+# ---------------------------------------------------------------------------
+# Preprocesado
+# ---------------------------------------------------------------------------
 
 static func _project_to_plane(points: Array[Vector3], normal: Vector3, centroid: Vector3) -> PackedVector2Array:
 	var n := normal.normalized()
 	if n.length() < 0.001:
 		n = Vector3.FORWARD
-
 	var u := n.cross(Vector3.UP)
 	if u.length() < 0.001:
 		u = n.cross(Vector3.RIGHT)
 	u = u.normalized()
 	var v := n.cross(u).normalized()
-
 	var out := PackedVector2Array()
 	for p in points:
 		var d := p - centroid
@@ -57,99 +181,75 @@ static func _project_to_plane(points: Array[Vector3], normal: Vector3, centroid:
 	return out
 
 
-static func _douglas_peucker(points: PackedVector2Array, epsilon: float) -> PackedVector2Array:
-	if points.size() < 3:
+static func _resample(points: PackedVector2Array, n: int) -> PackedVector2Array:
+	if points.size() < 2:
 		return points
 
-	var dmax := 0.0
-	var index := 0
-	var end := points.size() - 1
-	for i in range(1, end):
-		var d := _perp_distance(points[i], points[0], points[end])
-		if d > dmax:
-			dmax = d
-			index = i
+	var total := 0.0
+	for i in range(1, points.size()):
+		total += points[i].distance_to(points[i - 1])
 
-	var result := PackedVector2Array()
-	if dmax > epsilon:
-		var left := _douglas_peucker(points.slice(0, index + 1), epsilon)
-		var right := _douglas_peucker(points.slice(index, end + 1), epsilon)
-		result.append_array(left.slice(0, left.size() - 1))
-		result.append_array(right)
-	else:
-		result.append(points[0])
-		result.append(points[end])
-	return result
+	if total < 0.0001:
+		var same := PackedVector2Array()
+		for _i in range(n):
+			same.append(points[0])
+		return same
 
+	var interval := total / float(n - 1)
+	var out := PackedVector2Array()
+	out.append(points[0])
 
-static func _perp_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
-	var ab := b - a
-	if ab.length() < 0.00001:
-		return p.distance_to(a)
-	var t := (p - a).dot(ab) / ab.length_squared()
-	var proj := a + ab * t
-	return p.distance_to(proj)
+	var D := 0.0
+	var prev := points[0]
+	for i in range(1, points.size()):
+		var curr := points[i]
+		var d := prev.distance_to(curr)
+		if d < 0.00001:
+			continue
+		while D + d >= interval:
+			var t := (interval - D) / d
+			var q := prev.lerp(curr, t)
+			out.append(q)
+			prev = q
+			d = prev.distance_to(curr)
+			D = 0.0
+		D += d
+		prev = curr
 
+	while out.size() < n:
+		out.append(points[points.size() - 1])
 
-static func _count_corners(simplified: PackedVector2Array) -> int:
-	if simplified.size() < 3:
-		return 0
-	var corners := 0
-	for i in range(1, simplified.size() - 1):
-		var a := simplified[i - 1]
-		var b := simplified[i]
-		var c := simplified[i + 1]
-		var v1 := (b - a).normalized()
-		var v2 := (c - b).normalized()
-		var angle := rad_to_deg(v1.angle_to(v2))
-		if angle > CORNER_ANGLE_THRESHOLD_DEG:
-			corners += 1
-	return corners
+	return out
 
 
-static func _circularity_score(points_2d: PackedVector2Array) -> float:
-	if points_2d.is_empty():
-		return 999.0
+static func _normalize(points: PackedVector2Array) -> PackedVector2Array:
+	var min_x := INF
+	var max_x := -INF
+	var min_y := INF
+	var max_y := -INF
+	for p in points:
+		min_x = minf(min_x, p.x)
+		max_x = maxf(max_x, p.x)
+		min_y = minf(min_y, p.y)
+		max_y = maxf(max_y, p.y)
 
-	var min_x := 999.0
-	var max_x := -999.0
-	var min_y := 999.0
-	var max_y := -999.0
-	for p in points_2d:
-		min_x = min(min_x, p.x)
-		max_x = max(max_x, p.x)
-		min_y = min(min_y, p.y)
-		max_y = max(max_y, p.y)
-	var center := Vector2((min_x + max_x) * 0.5, (min_y + max_y) * 0.5)
+	var size: float = maxf(max_x - min_x, max_y - min_y)
+	if size < 0.0001:
+		return points
 
-	var mean_r := 0.0
-	for p in points_2d:
-		mean_r += p.distance_to(center)
-	mean_r /= points_2d.size()
-	if mean_r < 0.001:
-		return 999.0
+	var cx := (min_x + max_x) * 0.5
+	var cy := (min_y + max_y) * 0.5
 
-	var r_min := 999.0
-	var r_max := 0.0
-	var variance := 0.0
-	for p in points_2d:
-		var r := p.distance_to(center)
-		r_min = min(r_min, r)
-		r_max = max(r_max, r)
-		var diff := r - mean_r
-		variance += diff * diff
-	variance /= points_2d.size()
-
-	var score := sqrt(variance) / mean_r
-	print("[ShapeRecognizer] radio_medio=%.3f r_min=%.3f r_max=%.3f score=%.3f" % [
-		mean_r, r_min, r_max, score
-	])
-	return score
+	var out := PackedVector2Array()
+	for p in points:
+		out.append(Vector2((p.x - cx) / size, (p.y - cy) / size))
+	return out
 
 
-## Calcula la normal del mejor plano que pasa por los puntos del trazo,
-## usando el método de Newell. Se usa para que la bola de fuego salga
-## perpendicular al plano del dibujo (como si el círculo fuera un portal).
+# ---------------------------------------------------------------------------
+# Normal del plano (método de Newell)
+# ---------------------------------------------------------------------------
+
 static func estimate_plane_normal(points_3d: Array[Vector3]) -> Vector3:
 	if points_3d.size() < 3:
 		return Vector3.FORWARD

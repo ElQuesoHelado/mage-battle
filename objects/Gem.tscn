@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://ianki57jjusu"]
+
+[ext_resource type="Script" uid="uid://dqhsxsygjqjwu" path="res://pickup/gem.gd" id="1_rw122"]
+[ext_resource type="PackedScene" uid="uid://bonr3chjdnrlk" path="res://assets/book/alchemists_book.glb" id="2_obl38"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_obl38"]
+size = Vector3(1, 3.7401428, 3.616211)
+
+[node name="Gem" type="RigidBody3D" unique_id=462895499]
+script = ExtResource("1_rw122")
+
+[node name="Sketchfab_Scene" parent="." unique_id=1047092099 instance=ExtResource("2_obl38")]
+transform = Transform3D(0.025, 0, 0, 0, 0.025, 0, 0, 0, 0.025, -0.007992148, -0.05760342, -0.0144792795)
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1876639041]
+light_color = Color(0.13725491, 1, 0.9098039, 1)
+light_energy = 2.0
+light_volumetric_fog_energy = 2.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1963902331]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0.031709403, 0.17195892, 0.13081054)
+shape = SubResource("BoxShape3D_obl38")
