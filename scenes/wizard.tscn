@@ -697,6 +697,7 @@ shape = SubResource("CapsuleShape3D_4ysnb")
 [node name="Wizard_metarig" type="Node3D" parent="." unique_id=1355007018]
 
 [node name="Skeleton3D" type="Skeleton3D" parent="Wizard_metarig" unique_id=116709846]
+transform = Transform3D(-0.99985594, 0, -0.016972529, 0, 1, 0, 0.016972529, 0, -0.99985594, 0, 0, 0)
 bones/0/name = "spine"
 bones/0/parent = -1
 bones/0/rest = Transform3D(1.0000001, -3.497295e-09, 2.1211187e-07, 8.2184364e-08, 0.92817104, -0.37215394, -1.9557459e-07, 0.37215394, 0.92817104, -9.313226e-10, 0.6939573, -0.047399808)

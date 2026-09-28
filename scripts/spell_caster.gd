@@ -33,6 +33,18 @@ const COLOR := {
 	"tierra": Color(0.60, 0.38, 0.16),
 }
 
+## El cuerpo del mago se pinta con el color OPUESTO al de su debilidad,
+## para que el color del hechizo nunca se confunda con el color del
+## enemigo. Son dos intercambios: fuego<->agua y rayo<->tierra. Ojo: esto
+## NO cambia COLOR, que es la paleta elemental y la siguen usando los
+## proyectiles y el HUD.
+const TINT_COLOR := {
+	"fuego":  Color(0.15, 0.55, 1.00),
+	"agua":   Color(1.00, 0.35, 0.08),
+	"rayo":   Color(0.60, 0.38, 0.16),
+	"tierra": Color(1.00, 0.90, 0.25),
+}
+
 ## Texto corto que resume la regla, para el HUD.
 const RULE_TEXT := "FUEGO→AGUA · AGUA→RAYO · RAYO→TIERRA · TIERRA→FUEGO"
 const ENERGY_TEXT := "Dibuja un trazo largo para encender el ALTAR MAYOR"
@@ -49,6 +61,11 @@ static func label_of(element: String) -> String:
 
 static func color_of(element: String) -> Color:
 	return COLOR.get(element, Color.WHITE)
+
+
+## Color con el que se pinta el cuerpo de un mago débil a "element".
+static func tint_of(element: String) -> Color:
+	return TINT_COLOR.get(element, Color.WHITE)
 
 
 ## Elemento al que es vulnerable "element". Cadena vacía si no aplica.
@@ -99,6 +116,11 @@ static func weakness_text(weak: String) -> String:
 	Vector3(1.6, 0.1, -4.4),
 ]
 @export var wizard_max_health: int = 3
+## Tamaño de los magos de cada ola. wizard.tscn viene a escala 1.0, y
+## a esa distancia los magos se perdían contra el fondo del bosque.
+## 1.0 -> 1.2 -> 1.56 -> 1.4. Bajado de 1.56 porque a esa escala el
+## mago se comía demasiado campo de visión en el visor.
+@export var wizard_scale: float = 1.4
 ## Proyectil que lanzan los magos al libro. Se pasa a cada mago recién
 ## creado para que wizard.gd no lleve rutas escritas.
 @export var enemy_projectile: PackedScene
@@ -112,9 +134,13 @@ static func weakness_text(weak: String) -> String:
 ## Con la debilidad rotando, sólo uno de cada cuatro elementos le hace
 ## daño. Con 14 PV hacían falta unos 22 trazos de mano sólo para matarlo.
 @export var giant_max_health: int = 8
-@export var giant_scale: float = 2.6
+## Subido de 2.6 a 4.06 (x1.2 y luego x1.3) para que se lea como jefe
+## gigante y no como un mago normal estirado.
+@export var giant_scale: float = 4.06
 ## Distancia a la que aparece el jefe, por delante del jugador.
-@export var giant_spawn_distance: float = 4.5
+## estaba en 4.5 m; un metro más lejos para que el jefe no aparezca
+## encima de la cara y dé tiempo a verlo entrar.
+@export var giant_spawn_distance: float = 5.5
 @export var giant_cleanup_delay: float = 2.0
 ## El jefe dispara más despacio que los magos normales: es más grande
 ## y su animación se lee peor de lejos.
@@ -446,6 +472,7 @@ func _spawn_wave(index: int) -> void:
 		var w: Node3D = wizard_scene.instantiate()
 		w.weak_element = elements[i]
 		w.max_health = wizard_max_health
+		w.base_scale = Vector3.ONE * wizard_scale
 		w.attack_projectile = enemy_projectile
 
 		get_tree().current_scene.add_child(w)
@@ -557,16 +584,16 @@ func _build_hud_text() -> String:
 	return "\n".join(lines)
 
 
-## Vida del libro con 8 bloques, igual que la energía. Se pone en rojo
-## cuando entra en la zona roja, para que se note de un vistazo.
+## Vida del libro, sólo en porcentaje. Antes llevaba ocho bloques de
+## barra además del número, y en el visor ese texto tan largo se comía
+## medio campo de visión.
 func _book_line() -> String:
 	var cur: int = _book.health
 	var total: int = maxi(1, _book.max_health)
-	var lit: int = int(round(float(cur) / float(total) * 8.0))
-	var bar: String = "▮".repeat(lit) + "▯".repeat(8 - lit)
 	if _book.health <= 0:
 		return "LIBRO MAGICO DESTRUIDO"
-	return "LIBRO MAGICO  %s  %d/%d" % [bar, cur, total]
+	var pct := int(round(float(cur) / float(total) * 100.0))
+	return "LIBRO MAGICO  %d%%" % pct
 
 
 func _giant_weakness() -> String:
@@ -576,20 +603,17 @@ func _giant_weakness() -> String:
 	return String(giant.weak_element)
 
 
-## Barra de energía con 8 bloques. Es texto plano, no geometría, así que
-## no cuesta nada de FPS.
+## Energía del Altar Mayor, también sólo en porcentaje.
 func _energy_line() -> String:
 	if major_altar == null or not is_instance_valid(major_altar):
 		return "Sin Altar Mayor"
 
 	var fill: float = major_altar.get_fill()
-	var lit := int(round(fill * 8.0))
-	var bar := "▮".repeat(lit) + "▯".repeat(8 - lit)
 	var pct := int(round(fill * 100.0))
 
 	if not major_altar.is_online():
-		return "ALTAR MAYOR APAGADO  %s  %d%%" % [bar, pct]
-	return "ALTAR MAYOR  %s  %d%%" % [bar, pct]
+		return "ALTAR MAYOR APAGADO  %d%%" % pct
+	return "ALTAR MAYOR  %d%%" % pct
 
 
 func _set_hud(text: String) -> void:

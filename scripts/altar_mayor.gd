@@ -160,7 +160,7 @@ func _update_label() -> void:
 	if _estado == null:
 		return
 	if is_online():
-		_estado.text = "ENERGÍA %d%%" % int(round(get_fill() * 100.0))
+		_estado.text = "%d%%" % int(round(get_fill() * 100.0))
 		_estado.modulate = color_encendido
 	else:
 		_estado.text = "DIBUJA UN TRAZO"

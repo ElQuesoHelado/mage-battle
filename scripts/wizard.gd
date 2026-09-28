@@ -303,6 +303,10 @@ func take_damage(amount: int = 1, element: String = "") -> void:
 		return
 
 	if not weak_element.is_empty() and element != weak_element:
+		# El elemento no era el suyo: el golpe rebota sin hacer daño. Se
+		# ríe en vez de gritar, que es el otro mitad del par de sonidos al
+		# recibir un golpe.
+		_play_sound("risa", 0.14)
 		damage_rejected.emit(weak_element)
 		return
 
@@ -407,10 +411,10 @@ func _tint() -> void:
 	if weak_element.is_empty():
 		return
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = SpellSystem.color_of(weak_element)
+	mat.albedo_color = SpellSystem.tint_of(weak_element)
 	mat.roughness = 0.8
 	mat.emission_enabled = true
-	mat.emission = SpellSystem.color_of(weak_element)
+	mat.emission = SpellSystem.tint_of(weak_element)
 	# Un toque de emisión sólo: si no, en la penumbra del escenario el
 	# color no se distingue del material blanco original.
 	mat.emission_energy_multiplier = 0.25
@@ -474,7 +478,7 @@ func _update_weakness_label() -> void:
 	if _weakness_label == null:
 		return
 	if weak_element.is_empty():
-		_weakness_label.text = "ANY"
+		_weakness_label.text = "."
 		_weakness_label.modulate = Color(0.85, 0.3, 0.85)
 	else:
 		_weakness_label.text = "↓ %s" % SpellSystem.label_of(weak_element)

@@ -12,9 +12,10 @@ signal destruido
 # Rutas opcionales. Si no existen, se usan fallbacks.
 @export var ruta_contenedor_modelos: NodePath = ^"Modelos"
 
-## Texto que resume las reglas. Se muestra junto con el libro al
-## abrirlo, para que el jugador no tenga que memorizar el ciclo.
-@export var texto_reglas: Label3D
+## Antes aquí había un Label3D con las reglas y el ciclo de debilidades
+## ("FUEGO→AGUA · AGUA→RAYO…"). Era demasiado texto en el visor y tapaba
+## la arena, así que se quitó del nodo. La etiqueta de vida
+## (_build_health_label) sigue en pie: ésa sí se queda.
 
 ## El libro flota en el centro de la arena.
 @export var float_height: float = 0.05
@@ -56,10 +57,6 @@ func _ready() -> void:
 	for m in modelos:
 		if is_instance_valid(m):
 			m.visible = false
-
-	if texto_reglas != null:
-		texto_reglas.text = SpellSystem.RULE_TEXT + "\n" + SpellSystem.ENERGY_TEXT
-		texto_reglas.visible = false
 
 	_base_y = position.y
 	health = max_health
@@ -168,14 +165,12 @@ func take_damage(amount: int = 1, _element: String = "") -> void:
 # ─────────────────────────────────────────────────────────────
 #  API pública
 # ─────────────────────────────────────────────────────────────
-## Pellizcar con la mano izquierda abre y cierra las reglas. El libro ya
-## no aparece y desaparece: sólo se muestra u oculta el texto.
+## Pellizcar con la mano izquierda abre y cierra las reglas. Ya no
+## muestra texto (se quitó el Label3D del ciclo de debilidades); abrir
+## y cerrar ya no hace nada visible, pero cerrar sí sigue pasando de
+## página, que es lo que le da vida al libro.
 func abrir() -> void:
-	if _abierto:
-		return
 	_abierto = true
-	if texto_reglas != null:
-		texto_reglas.visible = true
 
 
 func cerrar() -> void:
@@ -189,8 +184,6 @@ func cerrar() -> void:
 		estado_actual = (estado_actual + 1) % modelos.size()
 		modelos[estado_actual].visible = visible
 		estado_cambiado.emit(estado_actual)
-	if texto_reglas != null:
-		texto_reglas.visible = false
 
 
 func reiniciar_estado() -> void:

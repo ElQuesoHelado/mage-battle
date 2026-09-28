@@ -14,6 +14,9 @@
 [ext_resource type="Script" uid="uid://dym3ekgbygprn" path="res://xr_hand_fallback_modifier_3d.gd" id="11_dt502"]
 [ext_resource type="PackedScene" uid="uid://bymg1qpy1tu2w" path="res://assets/gltf/RightHandHumanoid.gltf" id="12_1b3q5"]
 [ext_resource type="PackedScene" uid="uid://bdbae27ieum0l" path="res://scenes/mageIntro.tscn" id="14_xsd0a"]
+[ext_resource type="Script" uid="uid://i2016ttpdq7k" path="res://scripts/altar_decorativo.gd" id="15_altar_dec"]
+[ext_resource type="Script" path="res://scripts/varita_decorativa.gd" id="16_varita_dec"]
+[ext_resource type="AudioStream" uid="uid://bujlusbhn5q04" path="res://assets/audio/musica1.mp3" id="17_mus1"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_eyx45"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -233,6 +236,25 @@ mesh = SubResource("BoxMesh_h12gs")
 
 [node name="mageIntro" parent="." unique_id=906681544 instance=ExtResource("14_xsd0a")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4503245)
+
+[node name="AltarDerechoEncendido" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 0, -3.2)
+script = ExtResource("15_altar_dec")
+encendido = true
+
+[node name="VaritaDel Altar" type="Node3D" parent="AltarDerechoEncendido"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("16_varita_dec")
+
+[node name="AltarIzquierdoApagado" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7, 0, -3.2)
+script = ExtResource("15_altar_dec")
+encendido = false
+
+[node name="MusicaFondo" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("17_mus1")
+volume_db = -6.0
+autoplay = true
 
 [editable path="XROrigin3D/LeftHandMesh/LeftHandHumanoid2"]
 [editable path="XROrigin3D/RightHandMesh/RightHandHumanoid2"]

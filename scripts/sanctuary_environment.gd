@@ -303,6 +303,13 @@ func _setup_environment_lighting() -> void:
 	env.glow_strength = 0.95
 	env.glow_bloom = 0.15
 
+	# AVISO: esta función SOLO se llama desde _generate_all(), y _ready()
+	# únicamente llama a _generate_all() cuando el nodo no tiene hijos. En
+	# main.tscn el santuario ya viene con todos sus hijos horneados en la
+	# escena, así que en runtime esto NUNCA se ejecuta y la iluminación
+	# real es la del sub_resource Environment del WorldEnvironment de
+	# main.tscn. Cualquier ajuste de luz hay que hacerlo ahí, no aquí.
+
 	world_env.environment = env
 
 
@@ -733,7 +740,10 @@ func _create_grass_terrain() -> void:
 
 
 func _create_grass_tufts_360() -> void:
-	var num_tufts := 750
+	# 750 matas saturaban el suelo y costaban un montón de draw calls:
+	# cada mata es un gltf con su propio ArrayMesh. Bajado a 150 para que
+	# se vea el terreno y el juego respire en el visor.
+	var num_tufts := 150
 	for i in range(num_tufts):
 		var angle := randf_range(0.0, TAU)
 		var dist := randf_range(1.4, 23.0)

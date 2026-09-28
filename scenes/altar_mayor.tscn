@@ -1,21 +1,6 @@
 [gd_scene format=3 uid="uid://ppxw3cibem53"]
 
-[ext_resource type="Script" path="res://scripts/altar_mayor.gd" id="1_mayorscr"]
-
-[sub_resource type="TorusMesh" id="TorusMesh_anillo"]
-inner_radius = 0.36
-outer_radius = 0.48
-rings = 24
-ring_segments = 8
-
-[sub_resource type="StandardMaterial3D" id="Mat_anillo"]
-transparency = 1
-shading_mode = 0
-blend_mode = 1
-albedo_color = Color(0.95, 0.9, 0.55, 0.9)
-emission_enabled = true
-emission = Color(0.95, 0.9, 0.55, 1)
-emission_energy_multiplier = 2.0
+[ext_resource type="Script" uid="uid://dlwifqqo62p38" path="res://scripts/altar_mayor.gd" id="1_mayorscr"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_base"]
 top_radius = 0.3
@@ -28,6 +13,29 @@ rings = 1
 albedo_color = Color(0.14, 0.13, 0.16, 1)
 roughness = 0.6
 
+[sub_resource type="TorusMesh" id="TorusMesh_anillo"]
+inner_radius = 0.36
+outer_radius = 0.48
+rings = 24
+ring_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="Mat_anillo"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+albedo_color = Color(0.95, 0.9, 0.55, 0.9)
+
+[sub_resource type="SphereMesh" id="SphereMesh_halo"]
+radial_segments = 10
+rings = 5
+
+[sub_resource type="StandardMaterial3D" id="Mat_halo"]
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(0.95, 0.9, 0.55, 0.18)
+
 [sub_resource type="SphereMesh" id="SphereMesh_nucleo"]
 radius = 0.26
 height = 0.52
@@ -38,76 +46,48 @@ rings = 6
 shading_mode = 0
 albedo_color = Color(0.35, 0.34, 0.4, 1)
 
-[sub_resource type="StandardMaterial3D" id="Mat_nucleo_encendido"]
-shading_mode = 0
-albedo_color = Color(0.95, 0.9, 0.55, 1)
-emission_enabled = true
-emission = Color(0.95, 0.9, 0.55, 1)
-emission_energy_multiplier = 4.0
-
-[sub_resource type="SphereMesh" id="SphereMesh_halo"]
-radius = 0.5
-height = 1.0
-radial_segments = 10
-rings = 5
-
-[sub_resource type="StandardMaterial3D" id="Mat_halo"]
-transparency = 1
-shading_mode = 0
-blend_mode = 1
-cull_mode = 2
-albedo_color = Color(0.95, 0.9, 0.55, 0.18)
-
-[sub_resource type="StandardMaterial3D" id="Mat_titulo"]
-albedo_color = Color(1, 1, 1, 1)
-emission_enabled = true
-emission_energy_multiplier = 1.0
-billboard_mode = 1
-
-[node name="AltarMayor" type="Node3D"]
+[node name="AltarMayor" type="Node3D" unique_id=2078527625]
 script = ExtResource("1_mayorscr")
 
-[node name="Base" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.11, 0)
+[node name="Base" type="MeshInstance3D" parent="." unique_id=1482309976]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.11, 0)
 mesh = SubResource("CylinderMesh_base")
 surface_material_override/0 = SubResource("Mat_base")
 
-[node name="Anillo" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.24, 0)
+[node name="Anillo" type="MeshInstance3D" parent="." unique_id=2063788415]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)
 cast_shadow = 0
 mesh = SubResource("TorusMesh_anillo")
 surface_material_override/0 = SubResource("Mat_anillo")
 
-[node name="Halo" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.55, 0)
+[node name="Halo" type="MeshInstance3D" parent="." unique_id=792751915]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
 cast_shadow = 0
 mesh = SubResource("SphereMesh_halo")
 surface_material_override/0 = SubResource("Mat_halo")
 
-[node name="Nucleo" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.55, 0)
+[node name="Nucleo" type="MeshInstance3D" parent="." unique_id=866719972]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
 cast_shadow = 0
 mesh = SubResource("SphereMesh_nucleo")
 surface_material_override/0 = SubResource("Mat_nucleo")
 
-[node name="Titulo" type="Label3D" parent="."]
-position = Vector3(0, 1.1, 0)
+[node name="Titulo" type="Label3D" parent="." unique_id=1881371901]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
 pixel_size = 0.0009
 billboard = 1
 fixed_size = true
+modulate = Color(0.95, 0.9, 0.55, 1)
 text = "ALTAR MAYOR"
 font_size = 80
 outline_size = 22
-modulate = Color(0.95, 0.9, 0.55, 1)
-outline_modulate = Color(0, 0, 0, 1)
 
-[node name="Estado" type="Label3D" parent="."]
-position = Vector3(0, 0.95, 0)
+[node name="Estado" type="Label3D" parent="." unique_id=1618743101]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
 pixel_size = 0.0008
 billboard = 1
 fixed_size = true
+modulate = Color(0.7, 0.7, 0.75, 1)
 text = "APAGADO"
 font_size = 52
 outline_size = 16
-modulate = Color(0.7, 0.7, 0.75, 1)
-outline_modulate = Color(0, 0, 0, 1)
