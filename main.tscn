@@ -8371,7 +8371,8 @@ script = ExtResource("8_gdsnk")
 grip_action = "pickup"
 
 [node name="libroMagico" parent="XROrigin3D" unique_id=842342573 instance=ExtResource("14_getpj")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5757, 1, -0.2778)
+transform = Transform3D(0.10633567, 0.95033836, 0.29248884, -0.32470706, 0.31121856, -0.8931452, -0.9398181, 0, 0.34167522, -1.4027202, 0.9542664, -1.1476097)
+max_health = 16
 
 [node name="RightHandMesh" type="XRNode3D" parent="XROrigin3D" unique_id=84293060]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, -0.5)
