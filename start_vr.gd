@@ -14,8 +14,13 @@ signal pose_recentered
 ## el juego sigue en modo escritorio y se puede revisar la escena.
 @export var quit_if_no_xr: bool = false
 
+## Si es true, fuerza el arranque en modo escritorio aunque haya soporte OpenXR en la PC.
+@export var force_desktop_mode: bool = false
+
 ## Altura de la cámara de respaldo para el modo escritorio.
 @export var desktop_camera_height: float = 1.7
+@export var camera_speed: float = 6.0
+@export var mouse_sensitivity: float = 0.003
 
 var xr_interface: OpenXRInterface
 var xr_is_focused: bool = false
@@ -35,8 +40,13 @@ func is_xr_active() -> bool:
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	xr_interface = XRServer.find_interface("OpenXR")
-	if xr_interface and xr_interface.is_initialized():
+	var use_vr := false
+	if not force_desktop_mode:
+		xr_interface = XRServer.find_interface("OpenXR")
+		if xr_interface and xr_interface.is_initialized():
+			use_vr = true
+
+	if use_vr:
 		print("OpenXR instantiated successfully.")
 		var vp: Viewport = get_viewport()
 
@@ -62,7 +72,7 @@ func _ready() -> void:
 	else:
 		# No hay runtime de OpenXR: PC sin visor, o runtime mal
 		# configurado en el sistema.
-		print("OpenXR not instantiated!")
+		print("OpenXR no disponible o modo escritorio activo.")
 		if quit_if_no_xr:
 			get_tree().quit()
 			return
@@ -71,28 +81,54 @@ func _ready() -> void:
 			+ "El seguimiento de manos y los hechizos por gestos quedan "
 			+ "desactivados."
 		)
-		_setup_desktop_camera()
+		var vp: Viewport = get_viewport()
+		vp.use_xr = false
+		call_deferred("_setup_desktop_camera")
 
 
 ## Sin una cámara activa, el modo escritorio mostraría una pantalla
-## negra. Se crea una Camera3D normal a la altura de la cabeza.
+## gris/negra. Se crea una Camera3D normal a la altura de la cabeza.
 func _setup_desktop_camera() -> void:
-	if get_viewport().get_camera_3d():
+	var vp := get_viewport()
+	if vp:
+		vp.use_xr = false
+
+	# Desactivar y remover cualquier XRCamera3D para que DesktopCamera sea la única activa
+	var origin := _find_xr_origin()
+	if origin:
+		for child in origin.get_children():
+			if child is Camera3D and child.name != "DesktopCamera":
+				child.current = false
+				child.queue_free()
+
+	var existing_cam := get_viewport().get_camera_3d()
+	if existing_cam != null and existing_cam.name == "DesktopCamera":
+		existing_cam.make_current()
 		return
+
+	if existing_cam != null and existing_cam is XRCamera3D:
+		existing_cam.current = false
 
 	var cam := Camera3D.new()
 	cam.name = "DesktopCamera"
+	cam.set_script(load("res://scripts/desktop_free_camera.gd"))
 
-	var origin := _find_xr_origin()
-	if origin:
-		# top_level para que la cámara no herede la escala del origen.
+	var root := get_tree().current_scene
+	if root:
+		root.add_child(cam)
+	elif origin:
 		cam.top_level = true
 		origin.add_child(cam)
 	else:
 		add_child(cam)
 
-	cam.position = Vector3(0.0, desktop_camera_height, 0.0)
+	cam.global_position = Vector3(0.0, 1.8, 3.5)
+	cam.look_at(Vector3(0.0, 1.2, 0.0), Vector3.UP)
+	cam.make_current()
 	cam.current = true
+	if cam.has_method("_sync_rotation"):
+		cam._sync_rotation()
+	print("[StartVR] DesktopCamera activada con script propio y lista para volar.")
 
 
 ## StartVR es hermano del XROrigin3D, no hijo, así que hay que mirar
