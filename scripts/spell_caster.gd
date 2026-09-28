@@ -534,7 +534,7 @@ func _spawn_giant() -> void:
 		giant.look_at(origin, Vector3.UP)
 
 	_giant_spawned = true
-	_set_feedback("¡El GRAN MAGO se alza! Su color dice qué le pega.")
+	_set_feedback(".")
 
 
 ## El libro se quedó sin vida: derrota.
@@ -572,9 +572,9 @@ func _build_hud_text() -> String:
 	if _giant_spawned and not _finished:
 		var weak := _giant_weakness()
 		if weak.is_empty():
-			lines.append("GRAN MAGO: le da igual el elemento")
+			lines.append(".")
 		else:
-			lines.append("GRAN MAGO · necesita %s" % label_of(weak))
+			lines.append(".")
 
 	lines.append(_energy_line())
 
@@ -593,7 +593,7 @@ func _book_line() -> String:
 	if _book.health <= 0:
 		return "LIBRO MAGICO DESTRUIDO"
 	var pct := int(round(float(cur) / float(total) * 100.0))
-	return "LIBRO MAGICO  %d%%" % pct
+	return "." % pct
 
 
 func _giant_weakness() -> String:
@@ -612,8 +612,8 @@ func _energy_line() -> String:
 	var pct := int(round(fill * 100.0))
 
 	if not major_altar.is_online():
-		return "ALTAR MAYOR APAGADO  %d%%" % pct
-	return "ALTAR MAYOR  %d%%" % pct
+		return "Sin mana  %d%%" % pct
+	return "Mana al:  %d%%" % pct
 
 
 func _set_hud(text: String) -> void:
@@ -691,4 +691,4 @@ func _spawn_mono() -> void:
 	if major_altar != null and is_instance_valid(major_altar):
 		major_altar.spend(cast_cost)
 	_cooldown = cooldown_seconds
-	_set_feedback("¡Mono invocado!")
+	_set_feedback("¡Mono!")

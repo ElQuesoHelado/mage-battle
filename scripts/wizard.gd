@@ -481,5 +481,5 @@ func _update_weakness_label() -> void:
 		_weakness_label.text = "."
 		_weakness_label.modulate = Color(0.85, 0.3, 0.85)
 	else:
-		_weakness_label.text = "↓ %s" % SpellSystem.label_of(weak_element)
+		_weakness_label.text = "↓"
 		_weakness_label.modulate = SpellSystem.color_of(weak_element)

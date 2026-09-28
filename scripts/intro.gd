@@ -2,6 +2,9 @@ extends Node3D
 
 @onready var wizard: Node3D = $mageIntro
 @onready var gem: RigidBody3D = $Table/Gem
+@onready var texto_mago: Label3D = $mageIntro/TextoSobreMago
+
+const TEXTO := "tu magia esta en tu voz, proteje al libro con ella"
 
 var _time := 0.0
 var _gem_base_y := 0.0
@@ -14,6 +17,7 @@ func _ready() -> void:
 	elif not wizard.has_signal("cast_started"):
 		push_error("[Intro] 'mageIntro' no expone la señal 'cast_started'")
 	else:
+
 		wizard.cast_started.connect(_show_gem)
 
 	if gem == null:
@@ -25,6 +29,11 @@ func _ready() -> void:
 	gem.freeze = true
 	gem.gravity_scale = 0.0
 	_gem_base_y = gem.global_position.y
+
+	# Texto sobre el mago: definir y mostrar desde el inicio
+	if texto_mago:
+		texto_mago.text = TEXTO
+		texto_mago.visible = true     # <- si lo quieres oculto hasta el cast, pon false
 
 
 func _process(delta: float) -> void:
@@ -41,6 +50,10 @@ func _show_gem() -> void:
 		return
 	_gem_active = true
 	gem.visible = true
+
+	# Aseguramos que el texto esté visible cuando el mago castea
+	if texto_mago:
+		texto_mago.visible = true
 
 	# Pequeño "pop" de aparición
 	gem.scale = Vector3.ZERO
