@@ -140,9 +140,9 @@ script = ExtResource("9_7dpha")
 
 [node name="LeftHandHumanoid2" parent="XROrigin3D/LeftHandMesh" unique_id=1103021127 instance=ExtResource("10_ufrnv")]
 
-[node name="XRHandModifier3D" type="XRHandModifier3D" parent="XROrigin3D/LeftHandMesh/LeftHandHumanoid2/LeftHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(1103021127, 1125943770) index="1" unique_id=1973581196]
+[node name="XRHandModifier3D" type="XRHandModifier3D" parent="XROrigin3D/LeftHandMesh/LeftHandHumanoid2/LeftHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(1103021127, 1432242727) index="1" unique_id=1973581196]
 
-[node name="XRHandFallbackModifier3D" type="SkeletonModifier3D" parent="XROrigin3D/LeftHandMesh/LeftHandHumanoid2/LeftHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(1103021127, 1125943770) index="2" unique_id=554109447]
+[node name="XRHandFallbackModifier3D" type="SkeletonModifier3D" parent="XROrigin3D/LeftHandMesh/LeftHandHumanoid2/LeftHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(1103021127, 1432242727) index="2" unique_id=554109447]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -170,10 +170,10 @@ hand = 1
 
 [node name="RightHandHumanoid2" parent="XROrigin3D/RightHandMesh" unique_id=90653821 instance=ExtResource("12_1b3q5")]
 
-[node name="XRHandModifier3D" type="XRHandModifier3D" parent="XROrigin3D/RightHandMesh/RightHandHumanoid2/RightHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(90653821, 1843288310) index="1" unique_id=1677190653]
+[node name="XRHandModifier3D" type="XRHandModifier3D" parent="XROrigin3D/RightHandMesh/RightHandHumanoid2/RightHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(90653821, 1996478645) index="1" unique_id=1677190653]
 hand_tracker = &"/user/hand_tracker/right"
 
-[node name="XRHandFallbackModifier3D" type="SkeletonModifier3D" parent="XROrigin3D/RightHandMesh/RightHandHumanoid2/RightHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(90653821, 1843288310) index="2" unique_id=1145812469]
+[node name="XRHandFallbackModifier3D" type="SkeletonModifier3D" parent="XROrigin3D/RightHandMesh/RightHandHumanoid2/RightHandHumanoid/Skeleton3D" parent_id_path=PackedInt32Array(90653821, 1996478645) index="2" unique_id=1145812469]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -240,8 +240,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4503245)
 [node name="Label3D" type="Label3D" parent="mageIntro" unique_id=1683859617]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2959316, 0)
 offset = Vector2(0, 2.25)
-text = "La magia esta en tu voz, toma el libro y protejelo
-que mono!"
+text = "La magia esta en tu voz, toma el libro y protejelo."
 
 [node name="AltarDerechoEncendido" type="Node3D" parent="." unique_id=2116366596]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 0, -3.2)

@@ -6,6 +6,9 @@ extends Node3D
 @export var titulo: String = "¡VICTORIA!"
 @export var subtitulo: String = "Has derrotado a los magos"
 
+#@export var titulo: String = ""
+#@export var subtitulo: String = ""
+
 ## Segundos hasta volver al juego. 0 = quedarse quieto.
 @export var restart_seconds: float = 10.0
 @export var next_scene: String = "res://main.tscn"

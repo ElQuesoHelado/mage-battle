@@ -593,7 +593,7 @@ func _book_line() -> String:
 	if _book.health <= 0:
 		return "LIBRO MAGICO DESTRUIDO"
 	var pct := int(round(float(cur) / float(total) * 100.0))
-	return "." % pct
+	return "%d%%" % pct
 
 
 func _giant_weakness() -> String:
@@ -623,6 +623,7 @@ func _set_hud(text: String) -> void:
 		return
 	_hud_cache = text
 	_hud.text = text
+	_hud.text = ""
 
 
 func _set_feedback(msg: String) -> void:

@@ -160,10 +160,12 @@ func _update_label() -> void:
 	if _estado == null:
 		return
 	if is_online():
-		_estado.text = "Grita tu magia %d%%" % int(round(get_fill() * 100.0))
+		#_estado.text = "Grita tu magia %d%%" % int(round(get_fill() * 100.0))
+		_estado.text = ""
 		_estado.modulate = color_encendido
 	else:
-		_estado.text = "Dibuja magia"
+		#_estado.text = "Dibuja magia"
+		_estado.text = ""
 		_estado.modulate = Color(0.7, 0.7, 0.75, 1.0)
 
 

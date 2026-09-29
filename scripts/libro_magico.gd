@@ -24,15 +24,35 @@ signal destruido
 @export_group("Vida")
 ## Puntos de vida. El libro es lo único que hay que proteger: si cae,
 ## derrota.
-@export var max_health: int = 12
+@export var max_health: int = 20
 ## Etiqueta flotante con la vida. El HUD también la muestra, pero el
 ## jugador puede estar mirando al libro y no a la etiqueta del centro.
-@export var show_health_label: bool = true
-## Contardo al recibir daño: el libro da un bote.
+@export var show_health_label: bool = false
+## Cuenta atrás al recibir daño: el libro da un bote.
 @export var hit_pulse: float = 0.14
 ## Por debajo de este porcentaje la etiqueta se pone en rojo.
 @export var danger_ratio: float = 0.34
 @export var health_label_height: float = 0.95
+
+@export_group("Daño en pantalla")
+## Activa el borde rojo en la vista del jugador.
+@export var show_damage_vignette: bool = true
+@export var vignette_color: Color = Color(0.9, 0.0, 0.02)
+## Opacidad máxima del destello al recibir un golpe (0..1).
+@export_range(0.0, 1.0) var vignette_hit_strength: float = 0.9
+## Segundos que tarda en apagarse el destello de un golpe.
+@export var vignette_hit_duration: float = 0.7
+## Opacidad del latido persistente cuando queda poca vida (0..1).
+@export_range(0.0, 1.0) var vignette_danger_strength: float = 1
+## Velocidad del latido con poca vida (rad/s).
+@export var vignette_pulse_speed: float = 8.0
+## Ángulo (grados desde el centro de la mirada) donde EMPIEZA el rojo.
+## Bájalo para que el rojo entre más hacia el centro.
+@export_range(0.0, 90.0) var vignette_inner_angle: float = 10.0
+## Ángulo (grados) donde el rojo llega a su máximo. Debe quedar DENTRO de lo
+## que ves con los lentes (en Quest ronda los 45-55°). Si no ves el efecto,
+## baja este valor; si es demasiado invasivo, súbelo.
+@export_range(1.0, 120.0) var vignette_outer_angle: float = 40.0
 
 var estado_actual: int = 0
 var health: int
@@ -43,6 +63,34 @@ var _base_y: float = 0.0
 var _health_label: Label3D
 ## Segundos que le queda al efecto de golpe. Se cuenta hacia atrás.
 var _pulse_left: float = 0.0
+
+# Viñeteado de daño
+var _vignette: MeshInstance3D
+var _vignette_mat: ShaderMaterial
+## Segundos que le quedan al destello rojo. Se cuenta hacia atrás.
+var _flash_left: float = 0.0
+
+# Esfera alrededor de la cabeza. El rojo se calcula por ÁNGULO respecto a
+# la dirección de la mirada (en el espacio de vista de cada ojo), así no
+# depende del rectángulo del buffer ni del recorte de los lentes.
+const _VIGNETTE_SHADER: String = """
+shader_type spatial;
+render_mode unshaded, depth_test_disabled, depth_draw_never, cull_disabled, shadows_disabled, blend_mix;
+
+uniform vec4 tint : source_color = vec4(0.9, 0.0, 0.02, 1.0);
+uniform float intensity : hint_range(0.0, 1.0) = 0.0;
+uniform float inner_angle = 20.0;
+uniform float outer_angle = 48.0;
+
+void fragment() {
+	vec3 dir = normalize(VERTEX);
+	// Ángulo entre la dirección de este fragmento y el frente de la vista.
+	float ang = acos(clamp(-dir.z, -1.0, 1.0));
+	float edge = smoothstep(radians(inner_angle), radians(outer_angle), ang);
+	ALBEDO = tint.rgb;
+	ALPHA = clamp(edge * intensity, 0.0, 1.0);
+}
+"""
 
 
 func _ready() -> void:
@@ -67,6 +115,7 @@ func _ready() -> void:
 	add_to_group("libro_magico")
 
 	_build_health_label()
+	_build_damage_vignette()
 
 	# El libro ya no se esconde esperando a que el jugador lo abra. Antes
 	# sólo aparecía al pellizcar con la mano izquierda, y eso no
@@ -75,6 +124,12 @@ func _ready() -> void:
 	visible = true
 	if not modelos.is_empty():
 		modelos[0].visible = true
+
+
+func _exit_tree() -> void:
+	# La esfera cuelga de la cámara, no de este nodo: hay que liberarla a mano.
+	if is_instance_valid(_vignette):
+		_vignette.queue_free()
 
 
 func _process(delta: float) -> void:
@@ -90,6 +145,8 @@ func _process(delta: float) -> void:
 		scale = Vector3.ONE * (1.0 + hit_pulse * k)
 	elif scale != Vector3.ONE:
 		scale = Vector3.ONE
+
+	_update_damage_vignette(delta)
 
 
 func _recolectar_modelos() -> void:
@@ -149,6 +206,7 @@ func take_damage(amount: int = 1, _element: String = "") -> void:
 
 	health = maxi(0, health - amount)
 	_pulse_left = hit_pulse
+	_flash_left = vignette_hit_duration
 	_update_health_label()
 
 	var director := get_tree().get_first_node_in_group("spell_system")
@@ -226,3 +284,90 @@ func _update_health_label() -> void:
 	_health_label.text = "LIBRO  %d/%d" % [health, max_health]
 	var bajo: bool = max_health > 0 and float(health) / float(max_health) <= danger_ratio
 	_health_label.modulate = Color(1.0, 0.25, 0.2) if bajo else Color(0.75, 1.0, 0.8)
+
+
+# ─────────────────────────────────────────────────────────────
+#  Viñeteado rojo de daño
+# ─────────────────────────────────────────────────────────────
+
+func _build_damage_vignette() -> void:
+	if not show_damage_vignette:
+		return
+
+	var shader := Shader.new()
+	shader.code = _VIGNETTE_SHADER
+
+	_vignette_mat = ShaderMaterial.new()
+	_vignette_mat.shader = shader
+	_vignette_mat.set_shader_parameter("tint", vignette_color)
+	_vignette_mat.set_shader_parameter("inner_angle", vignette_inner_angle)
+	_vignette_mat.set_shader_parameter("outer_angle", vignette_outer_angle)
+	_vignette_mat.set_shader_parameter("intensity", 0.0)
+	# Que se dibuje encima de todo lo transparente de la escena.
+	_vignette_mat.render_priority = 127
+
+	# Esfera centrada en la cabeza: cubre todas las direcciones, así el
+	# ángulo de la mirada siempre cae sobre algún fragmento.
+	var sphere := SphereMesh.new()
+	sphere.radius = 2.0
+	sphere.height = 4.0
+	sphere.radial_segments = 32
+	sphere.rings = 16
+
+	_vignette = MeshInstance3D.new()
+	_vignette.name = "ViñetaDaño"
+	_vignette.mesh = sphere
+	_vignette.material_override = _vignette_mat
+	_vignette.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_vignette.visible = false
+
+	_attach_vignette_to_camera()
+
+
+## Cuelga la esfera de la cámara activa (XRCamera3D en VR). La cámara puede
+## no existir todavía en _ready o cambiar de escena, por eso se reintenta
+## desde _process.
+func _attach_vignette_to_camera() -> void:
+	if _vignette == null:
+		return
+	var cam: Camera3D = get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	if _vignette.get_parent() == cam:
+		return
+	if _vignette.get_parent() != null:
+		_vignette.get_parent().remove_child(_vignette)
+	cam.add_child(_vignette)
+	_vignette.position = Vector3.ZERO
+
+
+func _update_damage_vignette(delta: float) -> void:
+	if _vignette == null or _vignette_mat == null:
+		return
+
+	_attach_vignette_to_camera()
+	if _vignette.get_parent() == null:
+		return
+
+	# 1) Destello por golpe: empieza fuerte y se apaga.
+	var flash: float = 0.0
+	if _flash_left > 0.0:
+		_flash_left = maxf(0.0, _flash_left - delta)
+		var t: float = _flash_left / maxf(vignette_hit_duration, 0.001)
+		flash = vignette_hit_strength * t * t
+
+	# 2) Peligro persistente: latido rojo mientras la vida esté baja.
+	var danger: float = 0.0
+	if max_health > 0:
+		var ratio: float = float(health) / float(max_health)
+		if health <= 0:
+			danger = vignette_danger_strength
+		elif ratio <= danger_ratio:
+			var severity: float = 1.0 - ratio / maxf(danger_ratio, 0.001)
+			var beat: float = 0.75 + 0.25 * sin(_time * vignette_pulse_speed)
+			danger = vignette_danger_strength * (0.5 + 0.5 * severity) * beat
+
+	var intensity: float = clampf(maxf(flash, danger), 0.0, 1.0)
+	_vignette.visible = intensity > 0.01
+	if _vignette.visible:
+		_vignette_mat.set_shader_parameter("intensity", intensity)

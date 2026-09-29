@@ -4,7 +4,8 @@ extends Node3D
 @onready var gem: RigidBody3D = $Table/Gem
 @onready var texto_mago: Label3D = $mageIntro/TextoSobreMago
 
-const TEXTO := "tu magia esta en tu voz, proteje al libro con ella"
+#const TEXTO := "tu magia esta en tu voz, proteje al libro con ella"
+const TEXTO := ""
 
 var _time := 0.0
 var _gem_base_y := 0.0
@@ -33,7 +34,7 @@ func _ready() -> void:
 	# Texto sobre el mago: definir y mostrar desde el inicio
 	if texto_mago:
 		texto_mago.text = TEXTO
-		texto_mago.visible = true     # <- si lo quieres oculto hasta el cast, pon false
+		texto_mago.visible = false     # <- si lo quieres oculto hasta el cast, pon false
 
 
 func _process(delta: float) -> void:
